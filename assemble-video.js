@@ -140,17 +140,48 @@ function addAudioAndSubs(videoPath, audioPath, subsPath, outputPath) {
 }
 
 function textToSRT(text, duration) {
-  const lines = text.split(/\n\n+/).filter(l => l.trim());
+  // Split by sentence (not paragraph) for better timing
+  const sentences = text
+    .replace(/\.\.\./g, '.')  // Treat ... as period
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => s.trim().length > 0);
+  
+  if (sentences.length === 0) {
+    return '';
+  }
+  
   const srtLines = [];
   let time = 0;
-  const avgDuration = duration / lines.length;
   
-  lines.forEach((line, i) => {
-    srtLines.push(`${i + 1}`);
-    srtLines.push(`${formatTime(time)} --> ${formatTime(time + avgDuration)}`);
-    srtLines.push(line.trim());
-    srtLines.push('');
-    time += avgDuration;
+  // Calculate duration per sentence based on word count
+  const totalWords = sentences.reduce((sum, s) => sum + s.split(/\s+/).length, 0);
+  const wordsPerSecond = totalWords / duration;
+  
+  sentences.forEach((sentence) => {
+    const wordCount = sentence.split(/\s+/).length;
+    const sentenceDuration = wordCount / wordsPerSecond;
+    
+    // Split long sentences (more than 8 words) into multiple subtitle lines
+    const words = sentence.split(/\s+/);
+    const chunks = [];
+    
+    for (let j = 0; j < words.length; j += 8) {
+      chunks.push(words.slice(j, j + 8).join(' '));
+    }
+    
+    const chunkDuration = sentenceDuration / chunks.length;
+    
+    chunks.forEach((chunk, ci) => {
+      const start = time + (ci * chunkDuration);
+      const end = start + chunkDuration;
+      
+      srtLines.push(`${Math.floor(srtLines.length / 4) + 1}`);
+      srtLines.push(`${formatTime(start)} --> ${formatTime(end)}`);
+      srtLines.push(chunk.trim());
+      srtLines.push('');
+    });
+    
+    time += sentenceDuration;
   });
   
   return srtLines.join('\n');
@@ -238,11 +269,18 @@ async function main() {
   const segments = [];
   const usedEffects = [];
   
+  // Shuffle effects to ensure variety (no repeats)
+  const shuffledEffects = [...MOTION_EFFECTS].sort(() => Math.random() - 0.5);
+  
   for (let i = 0; i < images.length; i++) {
     console.log(`  [${i + 1}/${images.length}] Processing...`);
     const segPath = path.join(tempDir, `seg_${i}.mp4`);
     
-    const result = await createImageVideo(images[i], durationPerImage, segPath);
+    // Use different effect for each image (cycle through shuffled effects)
+    const effectIndex = i % shuffledEffects.length;
+    const effect = shuffledEffects[effectIndex];
+    
+    const result = await createImageVideo(images[i], durationPerImage, segPath, effect.name);
     usedEffects.push(result.effect);
     segments.push(segPath);
   }
