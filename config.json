@@ -1,0 +1,29 @@
+{
+  "genre": "mystery",
+  "subgenres": ["crime", "paranormal", "thriller", "suspense"],
+  "defaultLength": 10,
+  "voiceStyle": "deep-mysterious",
+  "outputDir": "output/scripts",
+  "openaiModel": "gpt-4o-mini",
+  "storyStructures": [
+    "whodunit",
+    "found-footage",
+    "unsolved-twist",
+    "anthology",
+    "interactive-clues"
+  ],
+  "hooks": [
+    "What I'm about to tell you never made the headlines...",
+    "This case file was found in an abandoned warehouse...",
+    "The following story is entirely fictional, but it could have happened...",
+    "There are places in this world where people simply disappear...",
+    "I received an anonymous letter with no return address..."
+  ],
+  "endings": [
+    "To this day, nobody knows what really happened.",
+    "The truth died with him.",
+    "Some questions are better left unanswered.",
+    "What would you have done?",
+    "The case remains open... in our universe."
+  ]
+}

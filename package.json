@@ -1,0 +1,25 @@
+{
+  "name": "mysteryforge",
+  "version": "1.0.0",
+  "description": "Automated fictional mystery/crime story generator for YouTube content",
+  "main": "generate.js",
+  "scripts": {
+    "generate": "node generate.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "mystery",
+    "story-generator",
+    "youtube",
+    "ai",
+    "content-creation",
+    "llm",
+    "groq"
+  ],
+  "author": "Ronald John Atanoso",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ronaldjohnatanoso/mysteryforge.git"
+  }
+}

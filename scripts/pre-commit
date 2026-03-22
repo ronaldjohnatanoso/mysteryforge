@@ -1,0 +1,39 @@
+#!/bin/bash
+# Pre-commit hook to scan for secrets
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+echo "🔍 Scanning for hardcoded secrets..."
+
+# Check for .env files being committed
+env_files=$(git diff --cached --name-only | grep -E "\.env$|\.env\." || true)
+if [ -n "$env_files" ]; then
+    echo "❌ Attempting to commit .env files:"
+    echo "$env_files"
+    exit 1
+fi
+
+# Check for common API key patterns in staged files
+patterns=(
+    "sk-[a-zA-Z0-9]{20,}"
+    "gsk_[a-zA-Z0-9]{20,}"
+    "xox[baprs]-[a-zA-Z0-9-]+"
+    "ghp_[a-zA-Z0-9]{36}"
+    "gho_[a-zA-Z0-9]{36}"
+    "AKIA[0-9A-Z]{16}"
+)
+
+staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E "\.(js|ts|py|json|yaml|yml|md)$" || true)
+
+if [ -n "$staged_files" ]; then
+    for pattern in "${patterns[@]}"; do
+        matches=$(grep -H -n -E "$pattern" $staged_files 2>/dev/null || true)
+        if [ -n "$matches" ]; then
+            echo "❌ Found potential hardcoded secret:"
+            echo "$matches"
+            exit 1
+        fi
+    done
+fi
+
+echo "✅ No hardcoded secrets found"
+exit 0

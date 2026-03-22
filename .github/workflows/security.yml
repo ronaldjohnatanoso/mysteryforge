@@ -1,0 +1,68 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  scan-secrets:
+    name: Scan for hardcoded secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-env-files:
+    name: Check for .env files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find .env files
+        run: |
+          # Check for any .env files that might be committed
+          env_files=$(find . -name "*.env" -o -name ".env*" -not -path "./.git/*" 2>/dev/null || true)
+          if [ -n "$env_files" ]; then
+            echo "❌ Found .env files that should NOT be committed:"
+            echo "$env_files"
+            exit 1
+          fi
+          echo "✅ No .env files found in repository"
+
+      - name: Check for API key patterns
+        run: |
+          # Common API key patterns
+          patterns=(
+            "sk-[a-zA-Z0-9]{20,}"
+            "gsk_[a-zA-Z0-9]{20,}"
+            "xox[baprs]-[a-zA-Z0-9-]+"
+            "ghp_[a-zA-Z0-9]{36}"
+            "gho_[a-zA-Z0-9]{36}"
+            "AKIA[0-9A-Z]{16}"
+            "[a-zA-Z0-9_-]*api[_-]?key[a-zA-Z0-9_-]*\\s*=\\s*['\"][^'\"]+['\"]"
+          )
+          
+          found=0
+          for pattern in "${patterns[@]}"; do
+            matches=$(grep -r -E "$pattern" --include="*.js" --include="*.ts" --include="*.py" --include="*.json" --include="*.yaml" --include="*.yml" . 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+              echo "❌ Found potential hardcoded API key pattern: $pattern"
+              echo "$matches"
+              found=1
+            fi
+          done
+          
+          if [ $found -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ No hardcoded API keys detected"

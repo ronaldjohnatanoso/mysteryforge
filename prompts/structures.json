@@ -1,0 +1,62 @@
+{
+  "whodunit": {
+    "description": "Classic mystery where audience tries to figure out who committed the crime",
+    "beats": [
+      "Introduce the crime and victim",
+      "Present the suspects with motives",
+      "Reveal clues one by one",
+      "Red herrings and misdirection",
+      "The detective/narrator explains the solution",
+      "Final twist or confirmation"
+    ],
+    "endingType": "resolved"
+  },
+  "found-footage": {
+    "description": "Story told through discovered evidence - diary, tapes, logs",
+    "beats": [
+      "Discovery of the evidence",
+      "First innocuous entries/recordings",
+      "Something starts to feel wrong",
+      "Escalating strangeness",
+      "The disturbing revelation",
+      "Ambiguous or chilling ending"
+    ],
+    "endingType": "unresolved"
+  },
+  "unsolved-twist": {
+    "description": "Mystery presented with multiple theories, ending with a revelation that changes everything",
+    "beats": [
+      "The mysterious event/crime",
+      "Theory 1 - the obvious explanation",
+      "Theory 2 - the alternative",
+      "New evidence that contradicts both",
+      "The twist that recontextualizes everything",
+      "Deliberately unanswered questions"
+    ],
+    "endingType": "twist"
+  },
+  "anthology": {
+    "description": "Standalone story with complete beginning, middle, and end",
+    "beats": [
+      "Setting and character introduction",
+      "Inciting incident",
+      "Rising action",
+      "Climax",
+      "Resolution or haunting conclusion"
+    ],
+    "endingType": "varies"
+  },
+  "interactive-clues": {
+    "description": "Present clues throughout, ask audience to solve before revealing answer",
+    "beats": [
+      "The mystery setup",
+      "Clue 1 with explanation",
+      "Clue 2 with explanation",
+      "Clue 3 with explanation",
+      "Ask audience to pause and solve",
+      "The solution explained",
+      "How most people get it wrong"
+    ],
+    "endingType": "resolved"
+  }
+}
