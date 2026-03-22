@@ -20,6 +20,19 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ronaldjohnatanoso/mysteryforge.git"
+    "url": "git+https://github.com/ronaldjohnatanoso/mysteryforge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ronaldjohnatanoso/mysteryforge/issues"
+  },
+  "homepage": "https://github.com/ronaldjohnatanoso/mysteryforge#readme",
+  "dependencies": {
+    "edge-tts": "^1.0.1",
+    "gtts": "^0.2.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }
