@@ -53,12 +53,40 @@ function extractTitle(text) {
 }
 
 function extractStory(text) {
-  const m = text.match(/## Generated Story\n\n([\s\S]+?)(?=\n---)/);
-  return m ? m[1].trim() : text;
+  // Find the story content between "Generated Story" and "Prompt Used" or end
+  let m = text.match(/## Generated Story\n\n([\s\S]+?)(?=\n---\n## Prompt Used|$)/);
+  if (m) return m[1].trim();
+  return text;
 }
 
 function cleanNarration(text) {
-  return text.replace(/^##\s*/gm, '').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+  // Remove section headers like "Hook", "Part 1:", "Closing", "Thumbnail Text Suggestion"
+  let cleaned = text
+    .replace(/^Hook\s*$/gim, '')
+    .replace(/^Part \d+:.*$/gim, '')
+    .replace(/^Closing\s*$/gim, '')
+    .replace(/^Thumbnail Text Suggestion:.*$/gim, '')
+    .replace(/^Narration Time:.*$/gim, '')
+    .replace(/^Genre:.*$/gim, '')
+    .replace(/^Structure:.*$/gim, '')
+    .replace(/^Word Count:.*$/gim, '')
+    .replace(/^##\s*/gm, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  
+  // Remove any lines that are just section markers
+  cleaned = cleaned.split('\n').filter(line => {
+    const l = line.trim().toLowerCase();
+    return !['hook', 'closing'].includes(l) && 
+           !l.startsWith('part ') && 
+           !l.startsWith('thumbnail') &&
+           !l.startsWith('narration time') &&
+           !l.startsWith('genre:') &&
+           !l.startsWith('structure:');
+  }).join('\n');
+  
+  return cleaned.trim();
 }
 
 async function main() {

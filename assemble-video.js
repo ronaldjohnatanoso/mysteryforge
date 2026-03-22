@@ -93,9 +93,16 @@ async function main() {
   let storyFolder = null;
   if (args.includes('--latest') || args.length === 0) {
     const outputDir = path.join(process.cwd(), 'output');
-    const folders = fs.readdirSync(outputDir).filter(f => fs.statSync(path.join(outputDir, f)).isDirectory());
-    folders.sort().reverse();
-    storyFolder = path.join(outputDir, folders[0]);
+    const folders = fs.readdirSync(outputDir)
+      .filter(f => fs.statSync(path.join(outputDir, f)).isDirectory())
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(outputDir, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+    
+    if (folders.length === 0) {
+      console.error('No story folders found');
+      process.exit(1);
+    }
+    storyFolder = path.join(outputDir, folders[0].name);
   } else {
     storyFolder = args[0];
   }

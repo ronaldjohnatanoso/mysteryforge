@@ -59,15 +59,18 @@ async function main() {
   let input = args.find(a => a.endsWith('.txt') || a.endsWith('.md'));
   
   if (!input) {
-    // Find latest story folder
+    // Find latest story folder by modification time
     const outputDir = path.join(process.cwd(), 'output');
-    const folders = fs.readdirSync(outputDir).filter(f => fs.statSync(path.join(outputDir, f)).isDirectory());
+    const folders = fs.readdirSync(outputDir)
+      .filter(f => fs.statSync(path.join(outputDir, f)).isDirectory())
+      .map(f => ({ name: f, mtime: fs.statSync(path.join(outputDir, f)).mtime }))
+      .sort((a, b) => b.mtime - a.mtime);
+    
     if (folders.length === 0) {
       console.error('No story folders found. Generate a story first.');
       process.exit(1);
     }
-    folders.sort().reverse();
-    const latest = path.join(outputDir, folders[0]);
+    const latest = path.join(outputDir, folders[0].name);
     input = path.join(latest, 'narration.txt');
     if (!fs.existsSync(input)) input = path.join(latest, 'story.md');
   }
