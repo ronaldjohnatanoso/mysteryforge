@@ -1,0 +1,16 @@
+ffmpeg version N-123586-g711b1a52bd-20260322 Copyright (c) 2000-2026 the FFmpeg developers
+  built with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)
+  configuration: --prefix=/ffbuild/prefix --pkg-config-flags=--static --pkg-config=pkg-config --cross-prefix=aarch64-ffbuild-linux-gnu- --arch=aarch64 --cpu=armv8-a --target-os=linux --enable-gpl --enable-version3 --disable-debug --enable-iconv --enable-zlib --enable-libxml2 --enable-libsoxr --enable-openssl --enable-libvmaf --enable-fontconfig --enable-libharfbuzz --enable-libfreetype --enable-libfribidi --enable-vulkan --enable-libshaderc --enable-libvorbis --enable-libxcb --enable-xlib --enable-libpulse --enable-opencl --enable-gmp --enable-lzma --enable-liblcevc-dec --enable-amf --enable-libaom --enable-libaribb24 --enable-avisynth --enable-chromaprint --enable-libdav1d --disable-libdavs2 --enable-libdvdread --enable-libdvdnav --disable-libfdk-aac --enable-ffnvcodec --enable-cuda-llvm --enable-frei0r --enable-libgme --enable-libkvazaar --enable-libaribcaption --enable-libass --enable-libbluray --enable-libjxl --enable-libmp3lame --enable-libopus --enable-libplacebo --enable-librist --enable-libssh --enable-libtheora --enable-libvpx --enable-libwebp --enable-libzmq --enable-lv2 --disable-libvpl --enable-openal --enable-liboapv --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenh264 --enable-libopenjpeg --enable-libopenmpt --enable-librav1e --enable-librubberband --disable-schannel --enable-sdl2 --enable-libsnappy --enable-libsrt --enable-libsvtav1 --enable-libtwolame --enable-libuavs3d --enable-libdrm --disable-vaapi --enable-libvidstab --enable-libvvenc --enable-whisper --enable-libx264 --enable-libx265 --disable-libxavs2 --enable-libxvid --enable-libzimg --enable-libzvbi --extra-cflags=-DLIBTWOLAME_STATIC --extra-cxxflags= --extra-libs='-lgomp -ldl' --extra-ldflags=-pthread --extra-ldexeflags=-pie --cc=aarch64-ffbuild-linux-gnu-gcc --cxx=aarch64-ffbuild-linux-gnu-g++ --ar=aarch64-ffbuild-linux-gnu-gcc-ar --ranlib=aarch64-ffbuild-linux-gnu-gcc-ranlib --nm=aarch64-ffbuild-linux-gnu-gcc-nm --extra-version=20260322
+  libavutil      60. 29.100 / 60. 29.100
+  libavcodec     62. 29.101 / 62. 29.101
+  libavformat    62. 13.101 / 62. 13.101
+  libavdevice    62.  4.100 / 62.  4.100
+  libavfilter    11. 15.101 / 11. 15.101
+  libswscale      9.  7.100 /  9.  7.100
+  libswresample   6.  4.100 /  6.  4.100
+[in#0 @ 0xb52afe49d260] Skipping 1695 bytes of junk at 0.
+[in#0/mp3 @ 0xb52afe49d260] Estimating duration from bitrate, this may be inaccurate
+Input #0, mp3, from 'narration.mp3':
+  Duration: 00:01:47.97, start: 0.000000, bitrate: 64 kb/s
+  Stream #0:0: Audio: mp3 (mp3float), 24000 Hz, mono, fltp, 64 kb/s
+timeout: the monitored command dumped core
