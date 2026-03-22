@@ -1,220 +1,94 @@
 #!/usr/bin/env node
 
-/**
- * MysteryForge - Automated Mystery Story Generator
- * 
- * Generates fictional mystery/crime stories for YouTube content.
- * 
- * Usage:
- *   node generate.js [options]
- * 
- * Options:
- *   --genre <genre>      Story genre (default: mystery)
- *   --length <minutes>   Target length in minutes (default: 10)
- *   --structure <type>   Story structure type (default: random)
- *   --output <dir>       Output directory (default: output/scripts)
- *   --provider <name>    LLM provider: cerebras, groq, openai (default: auto)
- *   --model <model>      Model: auto, fast, balanced, best, or specific ID
- *   --list               List available structures
- */
-
 const fs = require('fs');
 const path = require('path');
 const { createProvider, autoSelectProvider } = require('./src/providers/llm-provider');
 
-// Load config
-const configPath = path.join(__dirname, 'config.json');
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+const structures = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompts', 'structures.json'), 'utf8'));
+const basePrompt = fs.readFileSync(path.join(__dirname, 'prompts', 'base-story.md'), 'utf8');
 
-// Load structures
-const structuresPath = path.join(__dirname, 'prompts', 'structures.json');
-const structures = JSON.parse(fs.readFileSync(structuresPath, 'utf8'));
-
-// Load base prompt template
-const basePromptPath = path.join(__dirname, 'prompts', 'base-story.md');
-const basePrompt = fs.readFileSync(basePromptPath, 'utf8');
-
-// Parse CLI args
 function parseArgs() {
   const args = process.argv.slice(2);
-  const options = {
-    genre: config.genre || 'mystery',
-    length: config.defaultLength || 10,
-    structure: null,
-    output: config.outputDir || 'output/scripts',
-    list: false,
-    provider: null,
-    model: 'auto'
-  };
-
+  const options = { genre: 'mystery', length: 10, structure: null, provider: null };
   for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--genre':
-        options.genre = args[++i];
-        break;
-      case '--length':
-        options.length = parseInt(args[++i], 10);
-        break;
-      case '--structure':
-        options.structure = args[++i];
-        break;
-      case '--output':
-        options.output = args[++i];
-        break;
-      case '--list':
-        options.list = true;
-        break;
-      case '--provider':
-        options.provider = args[++i];
-        break;
-      case '--model':
-        options.model = args[++i];
-        break;
-    }
+    if (args[i] === '--genre') options.genre = args[++i];
+    else if (args[i] === '--length') options.length = parseInt(args[++i]);
+    else if (args[i] === '--structure') options.structure = args[++i];
+    else if (args[i] === '--provider') options.provider = args[++i];
   }
-
   return options;
 }
 
-// Get random structure if not specified
-function getStructure(structureName) {
-  if (structureName && structures[structureName]) {
-    return { name: structureName, ...structures[structureName] };
-  }
-  const names = Object.keys(structures);
-  const randomName = names[Math.floor(Math.random() * names.length)];
-  return { name: randomName, ...structures[randomName] };
-}
-
-// Generate the prompt
-function generatePrompt(options, structure) {
-  const wordCount = options.length * 150; // ~150 words per minute
-  
-  const structureInstructions = structure.beats
-    .map((beat, i) => `${i + 1}. ${beat}`)
-    .join('\n');
-
-  let prompt = basePrompt
-    .replace('{{LENGTH}}', options.length)
-    .replace('{{WORD_COUNT}}', wordCount)
-    .replace('{{GENRE}}', options.genre)
+function generatePrompt(opts, structure) {
+  return basePrompt
+    .replace('{{LENGTH}}', opts.length)
+    .replace('{{WORD_COUNT}}', opts.length * 150)
+    .replace('{{GENRE}}', opts.genre)
     .replace(/{{STRUCTURE}}/g, structure.name)
-    .replace('{{STRUCTURE_INSTRUCTIONS}}', structureInstructions);
-
-  return prompt;
+    .replace('{{STRUCTURE_INSTRUCTIONS}}', structure.beats.map((b, i) => `${i+1}. ${b}`).join('\n'));
 }
 
-// Save output
-function saveOutput(content, prompt, options, structure, meta = {}) {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `story_${timestamp}.md`;
-  const outputPath = path.join(__dirname, options.output);
+function extractTitle(text) {
+  // Try to find title after "STORY TITLE:" marker
+  let m = text.match(/\*\*STORY TITLE\*\*:\s*(.+)/i);
+  if (m) return m[1].replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '_').substring(0, 40);
   
-  if (!fs.existsSync(outputPath)) {
-    fs.mkdirSync(outputPath, { recursive: true });
+  // Try bold with quotes like **"Title"**
+  m = text.match(/\*\*"(.+?)"\*\*/);
+  if (m) return m[1].replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '_').substring(0, 40);
+  
+  // Try bold that looks like a title (starts with capital, has multiple words)
+  const boldMatches = text.match(/\*\*([A-Z][^*]{5,50}?)\*\*/g);
+  if (boldMatches) {
+    for (const match of boldMatches) {
+      const title = match.replace(/\*\*/g, '').replace(/[^a-zA-Z0-9\s-]/g, '').trim();
+      if (title.split(' ').length > 2 && !title.toUpperCase().includes('HOOK') && !title.toUpperCase().includes('PART') && !title.toUpperCase().includes('THUMBNAIL')) {
+        return title.toLowerCase().replace(/\s+/g, '_').substring(0, 40);
+      }
+    }
   }
-
-  const filePath = path.join(outputPath, filename);
   
-  const fullContent = `# MysteryForge Generated Story
-
-## Metadata
-- Genre: ${options.genre}
-- Structure: ${structure.name}
-- Target Length: ${options.length} minutes
-- Generated: ${new Date().toISOString()}
-- Provider: ${meta.provider || 'unknown'}
-- Model: ${meta.model || 'unknown'}
-
----
-
-## Generated Story
-
-${content || '[Story generation pending - see prompt below]'}
-
----
-
-## Prompt Used
-
-\`\`\`
-${prompt}
-\`\`\`
-`;
-
-  fs.writeFileSync(filePath, fullContent);
-  return filePath;
+  return `story_${Date.now()}`;
 }
 
-// Main
+function extractStory(text) {
+  const m = text.match(/## Generated Story\n\n([\s\S]+?)(?=\n---)/);
+  return m ? m[1].trim() : text;
+}
+
+function cleanNarration(text) {
+  return text.replace(/^##\s*/gm, '').replace(/\*\*(.+?)\*\*/g, '$1').trim();
+}
+
 async function main() {
-  const options = parseArgs();
+  const opts = parseArgs();
+  const providerName = opts.provider || autoSelectProvider();
+  const structureName = opts.structure || Object.keys(structures)[Math.floor(Math.random() * Object.keys(structures).length)];
+  const structure = { name: structureName, ...structures[structureName] };
 
-  if (options.list) {
-    console.log('Available story structures:\n');
-    Object.entries(structures).forEach(([name, data]) => {
-      console.log(`  ${name}: ${data.description}`);
-      console.log(`    Beats: ${data.beats.length}, Ending: ${data.endingType}`);
-      console.log();
-    });
-    console.log('\nAvailable providers: cerebras, groq, openai');
-    console.log('Model aliases: fast, balanced, best, auto');
-    return;
-  }
+  console.log(`\n⚒️ Generating ${opts.genre} story (${opts.length}min) via ${providerName}...`);
 
-  // Auto-select provider if not specified
-  const providerName = options.provider || autoSelectProvider();
-  
-  console.log('\n⚒️  MysteryForge - Generating story...\n');
-  console.log(`  Genre: ${options.genre}`);
-  console.log(`  Length: ${options.length} minutes`);
-  console.log(`  Provider: ${providerName}`);
-  
-  const structure = getStructure(options.structure);
-  console.log(`  Structure: ${structure.name}`);
-  console.log('');
+  const provider = createProvider(providerName);
+  const result = await provider.chat({
+    messages: [{ role: 'user', content: generatePrompt(opts, structure) }],
+    system: 'You are a mystery writer. Generate suspenseful stories for YouTube narration.',
+    model: 'auto',
+    maxTokens: 4096
+  });
 
-  const prompt = generatePrompt(options, structure);
-  
-  let story = null;
-  let meta = {};
+  const title = extractTitle(result.content);
+  const story = extractStory(result.content);
+  const narration = cleanNarration(story);
 
-  try {
-    const provider = createProvider(providerName);
-    const modelInfo = provider.getModels();
-    
-    console.log(`  Model: ${provider.resolveModel(options.model)}`);
-    console.log('\n  Generating...');
-    
-    const result = await provider.chat({
-      messages: [{ role: 'user', content: prompt }],
-      system: 'You are a master mystery writer. Generate compelling fictional mystery stories for YouTube narration. Write in a suspenseful, engaging style suitable for voiceover.',
-      model: options.model,
-      maxTokens: 4096,
-      temperature: 0.8
-    });
-    
-    story = result.content;
-    meta = {
-      provider: providerName,
-      model: result.model,
-      tokens: result.usage
-    };
-    
-    console.log(`  Tokens used: ${result.usage?.total_tokens || 'N/A'}`);
-    
-  } catch (e) {
-    console.error(`\n❌ Generation failed: ${e.message}`);
-    process.exit(1);
-  }
+  const folder = path.join(__dirname, 'output', title.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50));
+  fs.mkdirSync(folder, { recursive: true });
 
-  const outputPath = saveOutput(story, prompt, options, structure, meta);
+  fs.writeFileSync(path.join(folder, 'story.md'), `# ${title.replace(/_/g, ' ')}\n\n${story}`);
+  fs.writeFileSync(path.join(folder, 'narration.txt'), narration);
 
-  console.log(`\n✅ Output saved to: ${outputPath}`);
-  
-  if (story) {
-    console.log('\n📖 Preview:\n');
-    console.log(story.substring(0, 500) + '...\n');
-  }
+  console.log(`\n✅ Saved: ${folder}/`);
+  console.log(`   Title: ${title.replace(/_/g, ' ')}\n`);
 }
 
-main();
+main().catch(e => { console.error('❌', e.message); process.exit(1); });
