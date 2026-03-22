@@ -6,7 +6,25 @@ const { createProvider, autoSelectProvider } = require('./src/providers/llm-prov
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
 const structures = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompts', 'structures.json'), 'utf8'));
-const basePrompt = fs.readFileSync(path.join(__dirname, 'prompts', 'base-story.md'), 'utf8');
+
+// Hood-style prompt for street narration
+const basePrompt = `You are a street storyteller telling a ${config.genre || 'mystery'} story to your homies.
+
+Talk AUTHENTIC hood style:
+- Use natural pauses: "..." for dramatic moments
+- Slang: blick, opps, shawty, homie, fam, deadass, no cap, on god, fr, facts
+- Phrases: "you feel me?", "know what I'm sayin?", "nah but check this out"
+- Break grammar naturally like real speech
+- Build tension like you was really there
+
+Story length: {{LENGTH}} minutes ({{WORD_COUNT}} words)
+Structure: {{STRUCTURE}}
+
+{{STRUCTURE_INSTRUCTIONS}}
+
+Start with a hook like: "Aight so check this out..." or "Nah fr you ain't gonna believe this..."
+
+Just tell the story. No headers. Natural flow with pauses. Make it feel real.`;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -24,32 +42,30 @@ function generatePrompt(opts, structure) {
   return basePrompt
     .replace('{{LENGTH}}', opts.length)
     .replace('{{WORD_COUNT}}', opts.length * 150)
-    .replace('{{GENRE}}', opts.genre)
     .replace(/{{STRUCTURE}}/g, structure.name)
     .replace('{{STRUCTURE_INSTRUCTIONS}}', structure.beats.map((b, i) => `${i+1}. ${b}`).join('\n'));
 }
 
 function extractTitle(text) {
-  // Try to find title after "STORY TITLE:" marker
-  let m = text.match(/\*\*STORY TITLE\*\*:\s*(.+)/i);
-  if (m) return m[1].replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '_').substring(0, 40);
-  
-  // Try bold with quotes like **"Title"**
-  m = text.match(/\*\*"(.+?)"\*\*/);
-  if (m) return m[1].replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/\s+/g, '_').substring(0, 40);
-  
-  // Try bold that looks like a title (starts with capital, has multiple words)
-  const boldMatches = text.match(/\*\*([A-Z][^*]{5,50}?)\*\*/g);
-  if (boldMatches) {
-    for (const match of boldMatches) {
-      const title = match.replace(/\*\*/g, '').replace(/[^a-zA-Z0-9\s-]/g, '').trim();
-      if (title.split(' ').length > 2 && !title.toUpperCase().includes('HOOK') && !title.toUpperCase().includes('PART') && !title.toUpperCase().includes('THUMBNAIL')) {
-        return title.toLowerCase().replace(/\s+/g, '_').substring(0, 40);
-      }
+  // Try first sentence or hook as title
+  const firstLine = text.split('\n')[0];
+  if (firstLine && firstLine.length > 10 && firstLine.length < 80) {
+    // Extract key words from first line
+    const words = firstLine.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).slice(0, 6);
+    if (words.length >= 3) {
+      return words.join('_').toLowerCase().substring(0, 50);
     }
   }
   
-  return `story_${Date.now()}`;
+  // Try to find a name or place mentioned
+  const names = text.match(/\b([A-Z][a-z]+)\b/g);
+  if (names && names.length > 0) {
+    const uniqueNames = [...new Set(names)].slice(0, 3);
+    return uniqueNames.join('_').toLowerCase() + '_story';
+  }
+  
+  // Fallback: use date
+  return `mystery_${Date.now()}`;
 }
 
 function extractStory(text) {
@@ -60,33 +76,12 @@ function extractStory(text) {
 }
 
 function cleanNarration(text) {
-  // Remove section headers like "Hook", "Part 1:", "Closing", "Thumbnail Text Suggestion"
-  let cleaned = text
-    .replace(/^Hook\s*$/gim, '')
-    .replace(/^Part \d+:.*$/gim, '')
-    .replace(/^Closing\s*$/gim, '')
-    .replace(/^Thumbnail Text Suggestion:.*$/gim, '')
-    .replace(/^Narration Time:.*$/gim, '')
-    .replace(/^Genre:.*$/gim, '')
-    .replace(/^Structure:.*$/gim, '')
-    .replace(/^Word Count:.*$/gim, '')
+  // For hood style, just clean up extra whitespace but keep the natural speech patterns
+  return text
     .replace(/^##\s*/gm, '')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-  
-  // Remove any lines that are just section markers
-  cleaned = cleaned.split('\n').filter(line => {
-    const l = line.trim().toLowerCase();
-    return !['hook', 'closing'].includes(l) && 
-           !l.startsWith('part ') && 
-           !l.startsWith('thumbnail') &&
-           !l.startsWith('narration time') &&
-           !l.startsWith('genre:') &&
-           !l.startsWith('structure:');
-  }).join('\n');
-  
-  return cleaned.trim();
 }
 
 async function main() {
@@ -100,9 +95,19 @@ async function main() {
   const provider = createProvider(providerName);
   const result = await provider.chat({
     messages: [{ role: 'user', content: generatePrompt(opts, structure) }],
-    system: 'You are a mystery writer. Generate suspenseful stories for YouTube narration.',
+    system: `You are a hood storyteller. Talk like you from the streets telling a crazy story to your homies at 2AM.
+
+STYLE:
+- Natural pauses with "..." 
+- Slang: blick, opps, shawty, homie, fam, deadass, no cap, on god, fr, facts
+- Phrases: "you feel me?", "know what I'm sayin?", "check this out"
+- Break grammar like real speech
+- Build tension, make it feel REAL
+
+Just tell the story naturally. No headers or sections. Raw narration.`,
     model: 'auto',
-    maxTokens: 4096
+    maxTokens: 4096,
+    temperature: 0.9
   });
 
   const title = extractTitle(result.content);
