@@ -61,6 +61,8 @@ output/
 3. ❌ Hardcoding API keys → ✅ Use environment variables
 4. ❌ Static images → ✅ Ken Burns motion effects
 5. ❌ Generic AI voice → ✅ Hood style with pauses
+6. ❌ Subtitles split by paragraph → ✅ Split by sentence (max 8 words)
+7. ❌ Repeated motion effects → ✅ Shuffle effects, no repeats
 
 ## Automated Tasks
 - **Schedule:** 10 AM + 10 PM Manila
