@@ -1,11 +1,18 @@
 {
   "name": "mysteryforge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Automated fictional mystery/crime story generator for YouTube content",
   "main": "generate.js",
   "scripts": {
     "generate": "node generate.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "synthesize": "node synthesize.js",
+    "images": "node fetch-images.js --latest",
+    "images:ai": "node fetch-images.js --latest --gemini",
+    "assemble": "node assemble-video.js --latest",
+    "build": "npm run generate && npm run synthesize && npm run images && npm run assemble",
+    "test": "node tests/generate.test.js && node tests/llm-provider.test.js",
+    "test:generate": "node tests/generate.test.js",
+    "test:provider": "node tests/llm-provider.test.js"
   },
   "keywords": [
     "mystery",
@@ -14,7 +21,10 @@
     "ai",
     "content-creation",
     "llm",
-    "groq"
+    "groq",
+    "cerebras",
+    "tts",
+    "video-generation"
   ],
   "author": "Ronald John Atanoso",
   "license": "MIT",

@@ -1,29 +1,69 @@
 {
-  "genre": "mystery",
-  "subgenres": ["crime", "paranormal", "thriller", "suspense"],
-  "defaultLength": 10,
-  "voiceStyle": "deep-mysterious",
-  "outputDir": "output/scripts",
-  "openaiModel": "gpt-4o-mini",
-  "storyStructures": [
-    "whodunit",
-    "found-footage",
-    "unsolved-twist",
-    "anthology",
-    "interactive-clues"
-  ],
-  "hooks": [
-    "What I'm about to tell you never made the headlines...",
-    "This case file was found in an abandoned warehouse...",
-    "The following story is entirely fictional, but it could have happened...",
-    "There are places in this world where people simply disappear...",
-    "I received an anonymous letter with no return address..."
-  ],
-  "endings": [
-    "To this day, nobody knows what really happened.",
-    "The truth died with him.",
-    "Some questions are better left unanswered.",
-    "What would you have done?",
-    "The case remains open... in our universe."
-  ]
+  "genres": {
+    "mystery": {
+      "name": "Mystery",
+      "description": "Classic mystery content",
+      "topics": [
+        { "type": "internet-mystery", "prompt": "A deleted website with disturbing content", "hook": "There was a website that only existed for 47 minutes..." },
+        { "type": "found-footage", "prompt": "A camcorder found in an abandoned location", "hook": "The tape was labeled 'DO NOT WATCH'..." },
+        { "type": "disappearance", "prompt": "Someone who vanished and left strange clues", "hook": "She left her phone, wallet, and keys on the kitchen table..." }
+      ],
+      "ambient": ["dark_ambient", "wind"],
+      "colorGrade": "thriller"
+    },
+    "revenge": {
+      "name": "Revenge Story",
+      "description": "Pro revenge, petty revenge, nuclear revenge - Reddit style",
+      "topics": [
+        { "type": "workplace-revenge", "prompt": "Employee gets back at terrible boss or coworker", "hook": "My boss thought he could steal my promotion..." },
+        { "type": "neighbor-revenge", "prompt": "Dealing with nightmare neighbor", "hook": "My neighbor parked in my spot every single day..." },
+        { "type": "family-revenge", "prompt": "Family member gets what they deserve", "hook": "My sister-in-law thought she could ruin my wedding..." },
+        { "type": "ex-revenge", "prompt": "Ex partner gets karma", "hook": "My ex thought keeping my dog was acceptable..." },
+        { "type": "petty-revenge", "prompt": "Small but satisfying revenge", "hook": "The guy in front of me at the movies wouldn't stop talking..." },
+        { "type": "nuclear-revenge", "prompt": "Absolute destruction revenge", "hook": "They messed with the wrong person..." }
+      ],
+      "ambient": ["city_ambience", "coffee_shop"],
+      "colorGrade": "none"
+    },
+    "horror": {
+      "name": "Horror",
+      "description": "Scary stories and creepypasta",
+      "topics": [
+        { "type": "monster", "prompt": "Something in the dark", "hook": "I heard it scratching at my door at 3am..." },
+        { "type": "haunting", "prompt": "Ghostly encounters", "hook": "The previous owners died in this house..." },
+        { "type": "creature", "prompt": "Encounter with unknown entity", "hook": "We found something in the woods..." }
+      ],
+      "ambient": ["horror_drone", "heartbeat"],
+      "colorGrade": "horror"
+    },
+    "confession": {
+      "name": "Confession",
+      "description": "Anonymous confessions and secrets",
+      "topics": [
+        { "type": "secret-life", "prompt": "Living a double life", "hook": "Nobody knows who I really am..." },
+        { "type": "dark-secret", "prompt": "Something I can never tell anyone", "hook": "I've kept this secret for 15 years..." },
+        { "type": "confession", "prompt": "Anonymous admission", "hook": "I need to tell someone what I did..." }
+      ],
+      "ambient": ["rain", "night_city"],
+      "colorGrade": "noir"
+    }
+  },
+  "ambientSounds": {
+    "dark_ambient": { "noise": "brown", "filters": ["lowpass=500", "highpass=80", "equalizer=f=200:g=5"], "volume": 0.12 },
+    "wind": { "noise": "pink", "filters": ["lowpass=2000", "highpass=200"], "volume": 0.08 },
+    "city_ambience": { "noise": "pink", "filters": ["lowpass=3000", "highpass=100", "volume=0.5"], "volume": 0.15 },
+    "coffee_shop": { "noise": "brown", "filters": ["lowpass=800", "highpass=150"], "volume": 0.1 },
+    "horror_drone": { "noise": "brown", "filters": ["lowpass=200", "highpass=40", "tremolo=f=0.5:d=0.5"], "volume": 0.15 },
+    "heartbeat": { "noise": "brown", "filters": ["lowpass=100", "highpass=30", "volume=2"], "volume": 0.1 },
+    "rain": { "noise": "pink", "filters": ["lowpass=4000", "highpass=500"], "volume": 0.12 },
+    "night_city": { "noise": "pink", "filters": ["lowpass=2000", "highpass=100"], "volume": 0.1 }
+  },
+  "colorGrades": {
+    "thriller": "colorbalance=rs=0.1:gs=-0.05:bs=0.15:rm=-0.1:gm=0.05:bm=0.1",
+    "horror": "colorbalance=rs=0.2:gs=-0.1:bs=-0.15:rm=0.1:gm=-0.05:bm=-0.1",
+    "noir": "format=gray,eq=contrast=1.2:brightness=-0.05",
+    "none": null
+  },
+  "defaultGenre": "mystery",
+  "defaultLength": 5
 }

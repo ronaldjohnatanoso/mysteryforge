@@ -3,196 +3,27 @@
 /**
  * MysteryForge Video Assembler
  * 
- * Combines audio + images into MP4 with cinematic motion effects.
- * Ken Burns style: zoom, pan, vignette, color grading.
+ * Combines audio + images + subtitles into MP4.
+ * Uses crossfade transitions and subtle zoom for visual interest.
+ * 
+ * Usage:
+ *   node assemble-video.js --latest        # Assemble latest story
+ *   node assemble-video.js "story_folder"  # Assemble specific story
  */
 
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { execSync } = require('child_process');
 
 const FFMPEG = process.env.FFMPEG_PATH || path.join(process.env.HOME, '.local/bin/ffmpeg');
 const FFPROBE = process.env.FFPROBE_PATH || path.join(process.env.HOME, '.local/bin/ffprobe');
 
-// Motion effects for cinematic look
-const MOTION_EFFECTS = [
-  // Slow zoom in
-  {
-    name: 'zoom-in',
-    filter: (duration) => {
-      const frames = Math.round(duration * 30);
-      return `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(zoom+0.001,1.3)':d=${frames}:s=1920x1080:fps=30`;
-    }
-  },
-  // Slow zoom out
-  {
-    name: 'zoom-out',
-    filter: (duration) => {
-      const frames = Math.round(duration * 30);
-      return `scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2,crop=1920:1080:320:180,zoompan=z='if(lte(zoom,1.0),1.3,max(1.001,zoom-0.001))':d=${frames}:s=1920x1080:fps=30`;
-    }
-  },
-  // Pan left to right
-  {
-    name: 'pan-right',
-    filter: (duration) => {
-      const frames = Math.round(duration * 30);
-      return `scale=2560:1080:force_original_aspect_ratio=decrease,pad=2560:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z=1.2:x='min((iw-iw*zoom)*(on/${frames}),iw-iw*zoom)':y='(ih-ih*zoom)/2':d=${frames}:s=1920x1080:fps=30`;
-    }
-  },
-  // Pan right to left
-  {
-    name: 'pan-left',
-    filter: (duration) => {
-      const frames = Math.round(duration * 30);
-      return `scale=2560:1080:force_original_aspect_ratio=decrease,pad=2560:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z=1.2:x='max(0,(iw-iw*zoom)*(1-on/${frames}))':y='(ih-ih*zoom)/2':d=${frames}:s=1920x1080:fps=30`;
-    }
-  },
-  // Zoom + pan (diagonal)
-  {
-    name: 'zoom-pan',
-    filter: (duration) => {
-      const frames = Math.round(duration * 30);
-      return `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(zoom+0.0008,1.25)':x='iw/2-(iw/zoom/2)+(on*2)':y='ih/2-(ih/zoom/2)+(on*1.5)':d=${frames}:s=1920x1080:fps=30`;
-    }
-  }
-];
-
-// Color grading presets
-const COLOR_GRADES = {
-  'thriller': 'colorbalance=rs=0.1:gs=-0.05:bs=0.15:rm=-0.1:gm=0.05:bm=0.1', // Teal/orange
-  'horror': 'colorbalance=rs=0.2:gs=-0.1:bs=-0.15:rm=0.1:gm=-0.05:bm=-0.1', // Red/desaturated
-  'mystery': 'colorbalance=rs=0:gs=0:bs=0.1:rm=0.05:gm=0:bm=0.1,eq=contrast=1.1:brightness=-0.02', // Cool blue
-  'noir': 'format=gray,colorbalance=rs=0:gs=0:bs=0:rm=0:gm=0:bm=0,eq=contrast=1.2:brightness=-0.05', // B&W high contrast
-  'none': null
-};
+// Crossfade duration in seconds
+const CROSSFADE_DURATION = 0.5;
 
 function getDuration(audioPath) {
-  return new Promise((resolve, reject) => {
-    exec(`${FFPROBE} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`, (err, stdout) => {
-      if (err) reject(err);
-      else resolve(parseFloat(stdout.trim()));
-    });
-  });
-}
-
-function createImageVideo(imagePath, duration, outputPath, effectType = null, colorGrade = 'mystery') {
-  return new Promise((resolve, reject) => {
-    // Pick random effect if not specified
-    const effect = effectType 
-      ? MOTION_EFFECTS.find(e => e.name === effectType) 
-      : MOTION_EFFECTS[Math.floor(Math.random() * MOTION_EFFECTS.length)];
-    
-    const baseFilter = effect.filter(duration);
-    
-    // Add color grading
-    const colorFilter = COLOR_GRADES[colorGrade] || COLOR_GRADES['mystery'];
-    const fullFilter = colorFilter ? `${baseFilter},${colorFilter}` : baseFilter;
-    
-    // Add vignette
-    const vignetteFilter = `${fullFilter},vignette=a=0.4`;
-    
-    const cmd = `${FFMPEG} -y -loop 1 -i "${imagePath}" -vf "${vignetteFilter}" -t ${duration} -c:v libx264 -preset medium -crf 22 -pix_fmt yuv420p "${outputPath}"`;
-    
-    exec(cmd, { timeout: 300000 }, (err, stdout, stderr) => {
-      if (err) {
-        // Fallback to simple zoom
-        const frames = Math.round(duration * 30);
-        const simpleFilter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(zoom+0.001,1.2)':d=${frames}:s=1920x1080:fps=30`;
-        const fallbackCmd = `${FFMPEG} -y -loop 1 -i "${imagePath}" -vf "${simpleFilter}" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
-        
-        exec(fallbackCmd, { timeout: 300000 }, (err2) => {
-          if (err2) reject(new Error(`FFmpeg failed: ${err2.message}`));
-          else resolve({ path: outputPath, effect: 'fallback' });
-        });
-      } else {
-        resolve({ path: outputPath, effect: effect.name });
-      }
-    });
-  });
-}
-
-function concatVideos(videoPaths, outputPath) {
-  return new Promise((resolve, reject) => {
-    const concatFile = `/tmp/concat_${Date.now()}.txt`;
-    fs.writeFileSync(concatFile, videoPaths.map(p => `file '${path.resolve(p)}'`).join('\n'));
-    exec(`${FFMPEG} -y -f concat -safe 0 -i "${concatFile}" -c copy "${outputPath}"`, { timeout: 300000 }, (err) => {
-      fs.unlinkSync(concatFile);
-      if (err) reject(err);
-      else resolve(outputPath);
-    });
-  });
-}
-
-function addAudioAndSubs(videoPath, audioPath, subsPath, outputPath) {
-  return new Promise((resolve, reject) => {
-    let cmd;
-    if (subsPath && fs.existsSync(subsPath)) {
-      cmd = `${FFMPEG} -y -i "${videoPath}" -i "${audioPath}" -vf "subtitles='${subsPath}':force_style='FontSize=24,FontColor=white,OutlineColour=black,Outline=2'" -c:v libx264 -preset medium -crf 22 -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
-    } else {
-      cmd = `${FFMPEG} -y -i "${videoPath}" -i "${audioPath}" -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 -shortest "${outputPath}"`;
-    }
-    exec(cmd, { timeout: 300000 }, (err) => {
-      if (err) reject(err);
-      else resolve(outputPath);
-    });
-  });
-}
-
-function textToSRT(text, duration) {
-  // Split by sentence (not paragraph) for better timing
-  const sentences = text
-    .replace(/\.\.\./g, '.')  // Treat ... as period
-    .split(/(?<=[.!?])\s+/)
-    .filter(s => s.trim().length > 0);
-  
-  if (sentences.length === 0) {
-    return '';
-  }
-  
-  const srtLines = [];
-  let time = 0;
-  
-  // Calculate duration per sentence based on word count
-  const totalWords = sentences.reduce((sum, s) => sum + s.split(/\s+/).length, 0);
-  const wordsPerSecond = totalWords / duration;
-  
-  sentences.forEach((sentence) => {
-    const wordCount = sentence.split(/\s+/).length;
-    const sentenceDuration = wordCount / wordsPerSecond;
-    
-    // Split long sentences (more than 8 words) into multiple subtitle lines
-    const words = sentence.split(/\s+/);
-    const chunks = [];
-    
-    for (let j = 0; j < words.length; j += 8) {
-      chunks.push(words.slice(j, j + 8).join(' '));
-    }
-    
-    const chunkDuration = sentenceDuration / chunks.length;
-    
-    chunks.forEach((chunk, ci) => {
-      const start = time + (ci * chunkDuration);
-      const end = start + chunkDuration;
-      
-      srtLines.push(`${Math.floor(srtLines.length / 4) + 1}`);
-      srtLines.push(`${formatTime(start)} --> ${formatTime(end)}`);
-      srtLines.push(chunk.trim());
-      srtLines.push('');
-    });
-    
-    time += sentenceDuration;
-  });
-  
-  return srtLines.join('\n');
-}
-
-function formatTime(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+  const result = execSync(`${FFPROBE} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`).toString();
+  return parseFloat(result.trim());
 }
 
 function getLatestStoryFolder() {
@@ -209,6 +40,124 @@ function getLatestStoryFolder() {
   return folders.length > 0 ? path.join(outputDir, folders[0].name) : null;
 }
 
+/**
+ * Generate SRT subtitles from narration text
+ */
+function generateSRT(text, duration) {
+  const sentences = text
+    .replace(/\.\.\./g, '.')
+    .split(/(?<=[.!?])\s+/)
+    .filter(s => s.trim().length > 0);
+
+  const totalWords = sentences.reduce((sum, s) => sum + s.split(/\s+/).length, 0);
+  const wordsPerSecond = totalWords / duration;
+
+  function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+  }
+
+  let time = 0;
+  let index = 1;
+  const srtLines = [];
+
+  sentences.forEach(sentence => {
+    const wordCount = sentence.split(/\s+/).length;
+    const sentenceDuration = wordCount / wordsPerSecond;
+    
+    // Split long sentences (more than 10 words)
+    const words = sentence.split(/\s+/);
+    const chunks = [];
+    for (let j = 0; j < words.length; j += 10) {
+      chunks.push(words.slice(j, j + 10).join(' '));
+    }
+    
+    const chunkDuration = sentenceDuration / chunks.length;
+    
+    chunks.forEach((chunk) => {
+      const start = time;
+      const end = time + chunkDuration;
+      
+      srtLines.push(`${index}`);
+      srtLines.push(`${formatTime(start)} --> ${formatTime(end)}`);
+      srtLines.push(chunk.trim());
+      srtLines.push('');
+      
+      index++;
+      time += chunkDuration;
+    });
+  });
+
+  return srtLines.join('\n');
+}
+
+/**
+ * Build ffmpeg filter for crossfade transitions and Ken Burns effect
+ */
+function buildSlideshowFilter(images, duration, crossfade = CROSSFADE_DURATION) {
+  const imageCount = images.length;
+  const totalCrossfadeTime = crossfade * (imageCount - 1);
+  const baseDuration = (duration + totalCrossfadeTime) / imageCount;
+  
+  // Build filter complex
+  let filterComplex = '';
+  const inputs = [];
+  
+  // Input all images with duration and zoom effect
+  for (let i = 0; i < imageCount; i++) {
+    // Ken Burns effect: slow zoom in
+    const zoomEnd = 1.0 + (Math.random() * 0.05 + 0.02); // 2-7% zoom
+    const panX = (Math.random() - 0.5) * 0.05; // Slight horizontal pan
+    const panY = (Math.random() - 0.5) * 0.05; // Slight vertical pan
+    
+    // Scale to 1920x1080 with padding, apply slow zoom/pan
+    filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,`;
+    filterComplex += `zoompan=z='min(zoom+0.0005,${zoomEnd.toFixed(3)})':x='iw/2-(iw/zoom/2)+${(panX * 100).toFixed(1)}*on':y='ih/2-(ih/zoom/2)+${(panY * 100).toFixed(1)}*on':d=${Math.round(baseDuration * 30)}:s=1920x1080:fps=30,format=yuv420p[v${i}];`;
+    inputs.push(`-loop 1 -t ${baseDuration.toFixed(2)} -i "${images[i]}"`);
+  }
+  
+  // Crossfade transitions
+  let lastOutput = 'v0';
+  for (let i = 1; i < imageCount; i++) {
+    const offset = baseDuration * i - crossfade * i;
+    filterComplex += `[${lastOutput}][v${i}]xfade=transition=fade:duration=${crossfade}:offset=${offset.toFixed(2)}[v${i}out];`;
+    lastOutput = `v${i}out`;
+  }
+  
+  // Final output
+  filterComplex += `[${lastOutput}]fps=30[outv]`;
+  
+  return { inputs: inputs.join(' '), filterComplex };
+}
+
+/**
+ * Simple slideshow fallback (no crossfade, just cuts with zoom)
+ */
+function buildSimpleFilter(images, duration) {
+  const imageCount = images.length;
+  const durationPerImage = duration / imageCount;
+  const framesPerImage = Math.round(durationPerImage * 30);
+  
+  const inputs = images.map(img => `-loop 1 -t ${durationPerImage.toFixed(2)} -i "${img}"`).join(' ');
+  
+  // Concat filter with Ken Burns effect on each
+  let filterComplex = '';
+  for (let i = 0; i < imageCount; i++) {
+    const zoomDirection = i % 2 === 0 ? 1.05 : 1.03; // Alternate zoom levels
+    filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,`;
+    filterComplex += `zoompan=z='min(zoom+0.0003,${zoomDirection})':d=${framesPerImage}:s=1920x1080:fps=30,format=yuv420p[v${i}];`;
+  }
+  
+  // Concat all
+  const inputsList = images.map((_, i) => `[v${i}]`).join('');
+  filterComplex += `${inputsList}concat=n=${imageCount}:v=1:a=0[outv]`;
+  
+  return { inputs, filterComplex };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   
@@ -223,83 +172,99 @@ async function main() {
     storyFolder = args[0];
   }
 
-  console.log(`\n🎬 Assembling video from: ${storyFolder}`);
+  console.log(`\n🎬 Assembling video: ${path.basename(storyFolder)}`);
 
-  const audioFile = fs.readdirSync(storyFolder).find(f => f.endsWith('.mp3') || f.endsWith('.wav'));
-  if (!audioFile) {
-    console.error('No audio file found');
-    process.exit(1);
-  }
-  
-  const audioPath = path.join(storyFolder, audioFile);
+  const audioPath = path.join(storyFolder, 'narration.mp3');
   const narrationPath = path.join(storyFolder, 'narration.txt');
   const imagesDir = path.join(storyFolder, 'images');
-  
-  let images = [];
-  if (fs.existsSync(imagesDir)) {
-    images = fs.readdirSync(imagesDir)
-      .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
-      .map(f => path.join(imagesDir, f));
-  }
-  
-  if (images.length === 0) {
-    console.error('No images found');
+
+  // Check prerequisites
+  if (!fs.existsSync(audioPath)) {
+    console.error('❌ No narration.mp3 found. Run: node synthesize.js');
     process.exit(1);
   }
 
-  const duration = await getDuration(audioPath);
-  console.log(`  Duration: ${duration.toFixed(1)}s`);
-  console.log(`  Images: ${images.length}`);
-  console.log(`  Effects: Ken Burns (randomized per image)`);
-  console.log(`  Color grade: mystery (teal/blue tones)`);
-  
+  // Get images (sorted)
+  let images = fs.readdirSync(imagesDir)
+    .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
+    .sort()
+    .map(f => path.join(imagesDir, f));
+
+  if (images.length === 0) {
+    console.error('❌ No images found in images/');
+    process.exit(1);
+  }
+
+  const duration = getDuration(audioPath);
+  const durationPerImage = duration / images.length;
+
+  console.log(`   Duration: ${duration.toFixed(1)}s`);
+  console.log(`   Images: ${images.length} (${durationPerImage.toFixed(1)}s per image)`);
+  console.log(`   Subtitles: ${fs.existsSync(narrationPath) ? 'yes' : 'no'}`);
+
+  const outputPath = path.join(storyFolder, 'video.mp4');
+  const tempOutput = path.join(storyFolder, 'video_temp.mp4');
+
+  // Generate subtitles
   let subsPath = null;
   if (fs.existsSync(narrationPath)) {
     const narration = fs.readFileSync(narrationPath, 'utf8');
-    const srt = textToSRT(narration, duration);
+    const srt = generateSRT(narration, duration);
     subsPath = path.join(storyFolder, 'subtitles.srt');
     fs.writeFileSync(subsPath, srt);
-    console.log('  Subtitles: generated');
+    console.log(`   Generated ${srt.split('\n').filter(l => l.match(/^\d+$/)).length} subtitle entries`);
   }
-  
-  const tempDir = `/tmp/mysteryforge_${Date.now()}`;
-  fs.mkdirSync(tempDir, { recursive: true });
-  
-  const durationPerImage = duration / images.length;
-  const segments = [];
-  const usedEffects = [];
-  
-  // Shuffle effects to ensure variety (no repeats)
-  const shuffledEffects = [...MOTION_EFFECTS].sort(() => Math.random() - 0.5);
-  
-  for (let i = 0; i < images.length; i++) {
-    console.log(`  [${i + 1}/${images.length}] Processing...`);
-    const segPath = path.join(tempDir, `seg_${i}.mp4`);
-    
-    // Use different effect for each image (cycle through shuffled effects)
-    const effectIndex = i % shuffledEffects.length;
-    const effect = shuffledEffects[effectIndex];
-    
-    const result = await createImageVideo(images[i], durationPerImage, segPath, effect.name);
-    usedEffects.push(result.effect);
-    segments.push(segPath);
+
+  console.log('\n   Building video...');
+
+  // Build slideshow - use simple filter if images > 30 (crossfade gets slow)
+  const useSimple = images.length > 30;
+  const { inputs, filterComplex } = useSimple 
+    ? buildSimpleFilter(images, duration)
+    : buildSlideshowFilter(images, duration);
+
+  // Build and run ffmpeg command
+  const baseCmd = `${FFMPEG} -y ${inputs} -i "${audioPath}" \
+    -filter_complex "${filterComplex}" \
+    -map "[outv]" -map ${images.length}:a \
+    -c:v libx264 -preset fast -crf 23 \
+    -c:a aac -b:a 192k \
+    -movflags +faststart \
+    "${tempOutput}" 2>&1`;
+
+  try {
+    execSync(baseCmd, { timeout: 600000, stdio: 'pipe' });
+  } catch (e) {
+    console.error('❌ Video encoding failed');
+    console.error(e.stdout?.toString() || e.message);
+    process.exit(1);
   }
-  
-  console.log(`  Effects used: ${usedEffects.join(', ')}`);
-  console.log('  Concatenating...');
-  
-  const videoOnly = path.join(tempDir, 'video.mp4');
-  await concatVideos(segments, videoOnly);
-  
-  console.log('  Adding audio...');
-  const outputPath = path.join(storyFolder, 'video.mp4');
-  await addAudioAndSubs(videoOnly, audioPath, subsPath, outputPath);
-  
-  for (const s of segments) try { fs.unlinkSync(s); } catch (e) {}
-  try { fs.unlinkSync(videoOnly); fs.rmdirSync(tempDir); } catch (e) {}
-  
+
+  // Add subtitles if we have them
+  if (subsPath) {
+    console.log('   Adding subtitles...');
+    
+    const escapedPath = subsPath.replace(/:/g, '\\:').replace(/\//g, '\\/');
+    
+    const subCmd = `${FFMPEG} -y -i "${tempOutput}" \
+      -vf "subtitles='${escapedPath}':force_style='FontSize=24,FontColor=white,OutlineColour=black,Outline=2,MarginV=40,FontName=Arial'" \
+      -c:v libx264 -preset fast -crf 23 -c:a copy "${outputPath}" 2>&1`;
+
+    try {
+      execSync(subCmd, { timeout: 300000, stdio: 'pipe' });
+      fs.unlinkSync(tempOutput);
+    } catch (e) {
+      console.log('   ⚠️ Subtitle burn failed, using video without subs');
+      fs.renameSync(tempOutput, outputPath);
+    }
+  } else {
+    fs.renameSync(tempOutput, outputPath);
+  }
+
+  const sizeMB = (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1);
   console.log(`\n✅ Video saved: ${outputPath}`);
-  console.log(`   Size: ${(fs.statSync(outputPath).size / 1024 / 1024).toFixed(1)} MB\n`);
+  console.log(`   Size: ${sizeMB} MB`);
+  console.log(`   Public URL: https://openclaw-4.tail40c51a.ts.net/${path.basename(storyFolder)}/video.mp4\n`);
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1); });
