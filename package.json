@@ -9,10 +9,12 @@
     "images": "node fetch-images.js --latest",
     "images:ai": "node fetch-images.js --latest --gemini",
     "assemble": "node assemble-video.js --latest",
+    "thumbnails": "node generate-thumbnails.js --latest",
+    "pipeline": "node pipeline.js",
     "build": "npm run generate && npm run synthesize && npm run images && npm run assemble",
-    "test": "node tests/generate.test.js && node tests/llm-provider.test.js",
+    "test": "node tests/generate.test.js && node tests/providers.test.js",
     "test:generate": "node tests/generate.test.js",
-    "test:provider": "node tests/llm-provider.test.js"
+    "test:providers": "node tests/providers.test.js"
   },
   "keywords": [
     "mystery",

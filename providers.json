@@ -1,0 +1,93 @@
+{
+  "providers": {
+    "text": {
+      "primary": "cloudflare",
+      "fallback": ["groq", "cerebras"],
+      "options": {
+        "cloudflare": {
+          "endpoint": "/text",
+          "model": "@cf/openai/gpt-oss-120b",
+          "max_tokens": 4096
+        },
+        "groq": {
+          "model": "llama-3.1-8b-instant",
+          "max_tokens": 4096
+        },
+        "cerebras": {
+          "model": "llama-3.3-70b",
+          "max_tokens": 4096
+        }
+      }
+    },
+    "image": {
+      "primary": "cloudflare",
+      "fallback": ["pexels", "pollinations"],
+      "options": {
+        "cloudflare": {
+          "endpoint": "/image",
+          "model": "@cf/black-forest-labs/flux-1-schnell",
+          "steps": 4
+        },
+        "pexels": {
+          "type": "stock_images",
+          "orientation": "landscape"
+        },
+        "pollinations": {
+          "type": "free_ai",
+          "width": 1920,
+          "height": 1080
+        }
+      }
+    },
+    "tts": {
+      "primary": "kokoro",
+      "fallback": ["cloudflare", "edge"],
+      "options": {
+        "kokoro": {
+          "type": "local_neural",
+          "voice": "af_sky",
+          "speed": 0.7,
+          "note": "82M params, runs on CPU, high quality"
+        },
+        "cloudflare": {
+          "endpoint": "/tts",
+          "model": "@cf/deepgram/aura-1",
+          "default_speaker": "orion"
+        },
+        "edge": {
+          "type": "microsoft_edge_tts",
+          "voice": "en-US-AriaNeural",
+          "note": "Free, high quality, 47 English voices"
+        }
+      }
+    },
+    "video": {
+      "primary": "pexels",
+      "fallback": ["cloudflare"],
+      "options": {
+        "pexels": {
+          "type": "stock_videos",
+          "orientation": "landscape",
+          "min_duration": 5
+        },
+        "cloudflare": {
+          "endpoint": "/image",
+          "note": "Generate static images instead of video clips"
+        }
+      }
+    }
+  },
+  "quota": {
+    "cloudflare": {
+      "daily_neurons": 10000,
+      "reset_time": "00:00 UTC",
+      "warning_threshold": 0.8
+    }
+  },
+  "defaults": {
+    "genre": "mystery",
+    "length_minutes": 2,
+    "voice": "orion",
+    "seconds_per_segment": 8
+  }
+}

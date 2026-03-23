@@ -14,7 +14,7 @@ credentials/
 *.key
 
 # Generated output (optional - uncomment if you don't want to track)
-# output/
+output/
 
 # OS files
 .DS_Store

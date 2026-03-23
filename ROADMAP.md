@@ -52,6 +52,8 @@ async function synthesizeVoice(script, voiceId) {
 ```
 
 ## Phase 4: Full Automation (In Progress)
+- [x] Cloudflare Worker backend (unified API for text, image, TTS)
+- [x] Provider fallback system (Cloudflare → Groq/Cerebras → Pexels/Pollinations)
 - [ ] Batch generation (generate 10 scripts at once)
 - [ ] Quality scoring (hook strength, engagement predictions)
 - [ ] Schedule queue (plan content calendar)
@@ -131,6 +133,16 @@ mysteryforge/
 ---
 
 ## Changelog
+
+### v1.2.0 (2026-03-23)
+- Added Cloudflare Worker backend integration (text, image, TTS, transcription)
+- Added unified pipeline.js for all-in-one generation
+- Added provider fallback system (Cloudflare → Groq/Cerebras → Pexels/Pollinations)
+- Added worker-client.js for Cloudflare Worker API calls
+- Added character anchor system for consistent character rendering
+- Added Ken Burns effect variations for character shots
+- Updated tests for new provider architecture
+- Added providers.json for centralized provider configuration
 
 ### v1.1.0 (2026-03-23)
 - Added unit tests for generate.js and llm-provider.js
