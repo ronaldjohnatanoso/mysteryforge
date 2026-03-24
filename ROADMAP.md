@@ -36,15 +36,15 @@ async function synthesizeVoice(script, voiceId) {
 }
 ```
 
-## Phase 3: Visual Assembly ✅ (Partial)
+## Phase 3: Visual Assembly ✅ (Complete)
 - [x] Stock footage API (Pexels)
 - [x] AI image generation (Gemini Imagen, Pollinations)
 - [x] Scene timing based on script segments
 - [x] Ken Burns effect for static images
 - [x] Crossfade transitions
 - [x] Auto-generate subtitles (SRT from narration)
-- [ ] Auto-generate thumbnail candidates
-- [ ] Video templates for different platforms
+- [x] Auto-generate thumbnail candidates
+- [x] Video templates for different platforms
 
 ```javascript
 // Current: fetch-images.js supports Pexels + Gemini + Pollinations
@@ -56,8 +56,9 @@ async function synthesizeVoice(script, voiceId) {
 - [x] Provider fallback system (Cloudflare → Groq/Cerebras → Pexels/Pollinations)
 - [x] Batch generation (generate multiple stories at once)
 - [x] Quality scoring (hook strength, engagement predictions)
+- [x] YouTube upload script (OAuth-based, requires setup)
 - [ ] Schedule queue (plan content calendar)
-- [ ] Auto-upload to YouTube (YouTube Data API)
+- [ ] Full YouTube API integration (install googleapis package)
 - [ ] Analytics feedback loop
 
 ## Phase 5: Scaling
@@ -133,6 +134,14 @@ mysteryforge/
 ---
 
 ## Changelog
+
+### v1.4.0 (2026-03-24)
+- Added platform-templates.js for multi-platform video exports (YouTube, TikTok, Instagram, Twitter)
+- Added youtube-upload.js with OAuth-based upload support
+- Integrated thumbnail generation into pipeline.js
+- Added comprehensive tests for platform templates and YouTube upload
+- Updated README with platform templates and YouTube upload documentation
+- Marked Phase 3 as complete in roadmap
 
 ### v1.3.0 (2026-03-24)
 - Added batch generation (batch-generate.js) for multiple stories at once

@@ -10,6 +10,9 @@ Automated YouTube content factory for fictional mystery, horror, revenge, and co
 - 🖼️ **Image Sources**: Pexels stock photos + AI generation (Gemini Imagen, Pollinations)
 - 🎬 **Video Assembly**: FFmpeg-powered with Ken Burns effects and crossfade transitions
 - 📝 **Auto Subtitles**: SRT generation from narration text
+- 📱 **Platform Templates**: Auto-create variants for YouTube, TikTok, Instagram, Twitter
+- 🖼️ **Thumbnail Generation**: Extract key frames for video thumbnails
+- 📤 **YouTube Upload**: OAuth-based upload script (requires setup)
 - 🔒 **Security-First**: CI/CD secret scanning, pre-commit hooks
 
 ## Quick Start
@@ -38,19 +41,26 @@ node fetch-images.js --latest --gemini
 
 # Assemble final video
 node assemble-video.js --latest
+
+# Generate thumbnails
+node generate-thumbnails.js --latest
+
+# Create platform-specific variants
+node platform-templates.js --latest --all
 ```
 
 ## Pipeline
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  generate.js │────▶│ synthesize.js│────▶│fetch-images.js│────▶│assemble.js │
-│   Story      │     │    TTS       │     │   Images    │     │   Video    │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-      │                   │                   │                   │
-      ▼                   ▼                   ▼                   ▼
-  story.json          narration.mp3       images/*.jpg        video.mp4
-  narration.txt
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  generate.js │────▶│ synthesize.js│────▶│fetch-images.js│────▶│assemble.js │────▶│platforms.js │
+│   Story      │     │    TTS       │     │   Images    │     │   Video    │     │  Variants   │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+      │                   │                   │                   │                   │
+      ▼                   ▼                   ▼                   ▼                   ▼
+  story.json          narration.mp3       images/*.jpg        video.mp4        youtube.mp4
+  narration.txt                                                                   tiktok.mp4
+                                                                                  instagram.mp4
 ```
 
 ## CLI Commands
@@ -66,15 +76,21 @@ node assemble-video.js --latest
 ### npm Scripts
 
 ```bash
-npm run generate    # Generate single story
-npm run batch       # Generate 5 stories (default)
-npm run batch:all   # Generate 1 story per genre (4 total)
-npm run synthesize  # Synthesize voice
-npm run images      # Fetch Pexels images
-npm run images:ai   # Fetch AI images (Gemini)
-npm run assemble    # Assemble video
-npm run build       # Full pipeline
-npm test            # Run tests
+npm run generate        # Generate single story
+npm run batch           # Generate 5 stories (default)
+npm run batch:all       # Generate 1 story per genre (4 total)
+npm run synthesize      # Synthesize voice
+npm run images          # Fetch Pexels images
+npm run images:ai       # Fetch AI images (Gemini)
+npm run assemble        # Assemble video
+npm run thumbnails      # Generate thumbnail candidates
+npm run platforms       # Create all platform variants
+npm run platforms:youtube  # YouTube variant only
+npm run platforms:tiktok   # TikTok variant only
+npm run upload          # Upload to YouTube (requires auth)
+npm run build           # Full pipeline (story → thumbnails)
+npm run build:full      # Full pipeline + platform variants
+npm test                # Run tests
 ```
 
 ### Batch Generation
@@ -166,6 +182,62 @@ FFMPEG_PATH=~/.local/bin/ffmpeg
 - **Crossfade Transitions**: Smooth transitions between images
 - **Auto Subtitles**: SRT generation with word-level timing
 - **Color Grading**: Genre-specific color grades (thriller, horror, noir)
+- **Platform Templates**: Auto-resize for YouTube, TikTok, Instagram, Twitter
+
+## Platform Templates
+
+Create platform-optimized video variants:
+
+```bash
+# Create all platform variants
+node platform-templates.js --latest --all
+
+# Create specific platform
+node platform-templates.js --latest --youtube
+node platform-templates.js --latest --tiktok
+node platform-templates.js --latest --reels
+node platform-templates.js --latest --instagram
+node platform-templates.js --latest --twitter
+```
+
+| Platform | Resolution | Aspect Ratio | Max Duration |
+|----------|------------|--------------|--------------|
+| YouTube | 1920×1080 | 16:9 | None |
+| TikTok | 1080×1920 | 9:16 | 3 min |
+| Instagram Reels | 1080×1920 | 9:16 | 90 sec |
+| Instagram Feed | 1080×1080 | 1:1 | 60 sec |
+| Twitter/X | 1200×675 | 16:9 | 2:20 |
+
+Outputs are saved to `output/<story>/platforms/`.
+
+## YouTube Upload
+
+Upload videos directly to YouTube (requires OAuth setup):
+
+```bash
+# Setup OAuth credentials
+node youtube-upload.js --auth
+
+# Upload latest video (unlisted by default)
+node youtube-upload.js --latest
+
+# Upload as public
+node youtube-upload.js --latest --public
+```
+
+### Setup Instructions
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project → Enable YouTube Data API v3
+3. Create OAuth 2.0 credentials (Desktop app)
+4. Set environment variables:
+   ```bash
+   export YOUTUBE_CLIENT_ID="your-client-id"
+   export YOUTUBE_CLIENT_SECRET="your-client-secret"
+   export YOUTUBE_REFRESH_TOKEN="your-refresh-token"
+   ```
+
+> ⚠️ YouTube has upload quotas (6 videos/day default).
 
 ## Security
 

@@ -143,6 +143,30 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     console.log(`   ❌ Audio: ${ttsResult.error}`);
   }
   
+  // ===== STEP 3: Generate Thumbnails =====
+  if (ttsResult.success && imagesOk > 0) {
+    console.log('\n🖼️  Generating thumbnails...');
+    
+    // Create thumbnails directory
+    const thumbsDir = path.join(folder, 'thumbnails');
+    fs.mkdirSync(thumbsDir, { recursive: true });
+    
+    // Pick 3 evenly distributed images for thumbnails
+    const imageFiles = fs.readdirSync(path.join(folder, 'images'))
+      .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
+      .sort();
+    
+    if (imageFiles.length > 0) {
+      const step = Math.max(1, Math.floor(imageFiles.length / 3));
+      for (let i = 0; i < 3 && i * step < imageFiles.length; i++) {
+        const srcPath = path.join(folder, 'images', imageFiles[i * step]);
+        const destPath = path.join(thumbsDir, `thumb_${String(i + 1).padStart(2, '0')}.jpg`);
+        fs.copyFileSync(srcPath, destPath);
+      }
+      console.log(`   ✓ Created 3 thumbnail candidates`);
+    }
+  }
+  
   // ===== Summary =====
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`\n⏱️  Total time: ${totalTime}s`);
@@ -151,6 +175,7 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   if (ttsResult.success && imagesOk > 0) {
     console.log(`\n🎬 Ready for video assembly:`);
     console.log(`   node assemble-video.js --latest`);
+    console.log(`   node platform-templates.js --latest --all`);
   }
 }
 

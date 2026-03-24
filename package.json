@@ -1,6 +1,6 @@
 {
   "name": "mysteryforge",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Automated fictional mystery/crime story generator for YouTube content",
   "main": "generate.js",
   "scripts": {
@@ -12,8 +12,14 @@
     "images:ai": "node fetch-images.js --latest --gemini",
     "assemble": "node assemble-video.js --latest",
     "thumbnails": "node generate-thumbnails.js --latest",
+    "platforms": "node platform-templates.js --latest --all",
+    "platforms:youtube": "node platform-templates.js --latest --youtube",
+    "platforms:tiktok": "node platform-templates.js --latest --tiktok",
+    "upload": "node youtube-upload.js --latest",
+    "upload:public": "node youtube-upload.js --latest --public",
     "pipeline": "node pipeline.js",
-    "build": "npm run generate && npm run synthesize && npm run images && npm run assemble",
+    "build": "npm run generate && npm run synthesize && npm run images && npm run assemble && npm run thumbnails",
+    "build:full": "npm run build && npm run platforms",
     "test": "node tests/test-suite.js",
     "test:providers": "node tests/providers.test.js",
     "test:generate": "node tests/generate.test.js"
