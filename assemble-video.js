@@ -97,31 +97,38 @@ function generateSRT(text, duration) {
 }
 
 /**
- * Build video filter with Ken Burns
- * Simplified for faster encoding
+ * Build video filter with support for mixed video/image inputs
  */
-function buildVideoFilter(images, segments, duration) {
-  const imageCount = images.length;
-  const durationPerImage = duration / imageCount;
-  const framesPerImage = Math.round(durationPerImage * 30);
+function buildVideoFilter(mediaFiles, segments, duration) {
+  const fileCount = mediaFiles.length;
+  const durationPerSegment = duration / fileCount;
+  const framesPerSegment = Math.round(durationPerSegment * 30);
   
   const inputs = [];
   let filterComplex = '';
   
-  for (let i = 0; i < imageCount; i++) {
-    const img = images[i];
-    const seg = segments[i] || {};
-    const isChar = seg.isCharacterShot || false;
+  for (let i = 0; i < fileCount; i++) {
+    const file = mediaFiles[i];
+    const isVideo = file.endsWith('.mp4');
     
-    inputs.push(`-loop 1 -t ${durationPerImage.toFixed(2)} -i "${img}"`);
-    
-    // Simple scale + fade (much faster than zoompan)
-    filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${i}];`;
+    if (isVideo) {
+      // Video file: trim to segment duration
+      inputs.push(`-t ${durationPerSegment.toFixed(2)} -i "${file}"`);
+      
+      // Scale and set fps for consistent output
+      filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v${i}];`;
+    } else {
+      // Image file: apply zoompan
+      inputs.push(`-loop 1 -t ${durationPerSegment.toFixed(2)} -i "${file}"`);
+      
+      // Simple scale (faster encoding)
+      filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${i}];`;
+    }
   }
   
   // Concat all
-  const inputsList = images.map((_, i) => `[v${i}]`).join('');
-  filterComplex += `${inputsList}concat=n=${imageCount}:v=1:a=0[outv]`;
+  const inputsList = mediaFiles.map((_, i) => `[v${i}]`).join('');
+  filterComplex += `${inputsList}concat=n=${fileCount}:v=1:a=0[outv]`;
   
   return { inputs: inputs.join(' '), filterComplex };
 }
@@ -153,16 +160,20 @@ async function main() {
     process.exit(1);
   }
 
-  // Get images (sorted)
-  const images = fs.readdirSync(imagesDir)
+  // Get media files (videos and images, sorted)
+  const mediaFiles = fs.readdirSync(imagesDir)
     .filter(f => f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.mp4'))
     .sort()
     .map(f => path.join(imagesDir, f));
 
-  if (images.length === 0) {
-    console.error('❌ No images found in images/');
+  if (mediaFiles.length === 0) {
+    console.error('❌ No media files found in images/');
     process.exit(1);
   }
+
+  // Count videos vs images
+  const videoCount = mediaFiles.filter(f => f.endsWith('.mp4')).length;
+  const imageCount = mediaFiles.filter(f => !f.endsWith('.mp4')).length;
 
   // Load story.json for segment info
   let segments = [];
@@ -175,7 +186,8 @@ async function main() {
   const charShots = segments.filter(s => s.isCharacterShot).length;
 
   console.log(`   Duration: ${duration.toFixed(1)}s`);
-  console.log(`   Images: ${images.length}`);
+  console.log(`   Media files: ${mediaFiles.length}`);
+  console.log(`   Videos: ${videoCount}, Images: ${imageCount}`);
   console.log(`   Character shots: ${charShots}`);
 
   const outputPath = path.join(storyFolder, 'video.mp4');
@@ -191,13 +203,13 @@ async function main() {
 
   console.log('\n   Building video...');
 
-  // Build filter with character-aware Ken Burns
-  const { inputs, filterComplex } = buildVideoFilter(images, segments, duration);
+  // Build filter with mixed video/image support
+  const { inputs, filterComplex } = buildVideoFilter(mediaFiles, segments, duration);
 
   // Run ffmpeg
   const cmd = `${FFMPEG} -y ${inputs} -i "${audioPath}" \
     -filter_complex "${filterComplex}" \
-    -map "[outv]" -map ${images.length}:a \
+    -map "[outv]" -map ${mediaFiles.length}:a \
     -c:v libx264 -preset fast -crf 23 \
     -c:a aac -b:a 192k \
     -movflags +faststart \

@@ -38,23 +38,24 @@ function checkQuotaReset() {
 
 /**
  * Generate text with automatic fallback
+ * Primary: Groq (llama-3.3-70b-versatile)
  * Returns { text, provider }
  */
 async function generateText(prompt, systemPrompt = null, maxTokens = 4096) {
-  const providers = ['cloudflare', 'groq', 'cerebras'];
+  const providers = ['groq', 'cerebras', 'cloudflare'];
   
   for (const provider of providers) {
     try {      
-      if (provider === 'cloudflare') {
-        const result = await textCloudflare(prompt, systemPrompt, maxTokens);
-        quotaUsage.cloudflare.neurons += 100;
-        return { text: result, provider: 'cloudflare' };
-      } else if (provider === 'groq' && GROQ_KEY) {
+      if (provider === 'groq' && GROQ_KEY) {
         const result = await textGroq(prompt, systemPrompt, maxTokens);
         return { text: result, provider: 'groq' };
       } else if (provider === 'cerebras' && CEREBRAS_KEY) {
         const result = await textCerebras(prompt, systemPrompt, maxTokens);
         return { text: result, provider: 'cerebras' };
+      } else if (provider === 'cloudflare') {
+        const result = await textCloudflare(prompt, systemPrompt, maxTokens);
+        quotaUsage.cloudflare.neurons += 100;
+        return { text: result, provider: 'cloudflare' };
       }
     } catch (e) {
       console.log(`   ${provider} failed: ${e.message.substring(0, 50)}`);
@@ -338,7 +339,7 @@ async function textGroq(prompt, system, maxTokens) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       messages,
       max_tokens: maxTokens
     })

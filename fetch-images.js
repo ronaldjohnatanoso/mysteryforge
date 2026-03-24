@@ -1,26 +1,27 @@
 #!/usr/bin/env node
 
 /**
- * MysteryForge Image Generator v2
+ * MysteryForge Media Generator v3
  * 
- * Generates images with character consistency:
- * - Character shots: prepend characterAnchor to imagePrompt
- * - Non-character shots: use imagePrompt directly
- * - Parallel batches for speed
- * - Saves character shots to both images/ and character-shots/
+ * Downloads:
+ * - VIDEO CLIPS for non-character segments (Pexels videos)
+ * - IMAGES for character segments (Pexels images, Cloudflare AI when available)
+ * 
+ * This makes videos more dynamic and monetization-friendly.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { generateImage: generateImageWithFallback } = require('./src/providers/index.js');
-
-const BATCH_SIZE = 5; // Parallel batch size
+const { generateImage } = require('./src/providers/index.js');
+const { searchVideos, downloadVideo, searchImages, downloadImage } = require('./src/images/fetcher.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
   return {
     latest: args.includes('--latest'),
-    count: args.includes('--count') ? parseInt(args[args.indexOf('--count') + 1], 10) : null
+    count: args.includes('--count') ? parseInt(args[args.indexOf('--count') + 1], 10) : null,
+    videosOnly: args.includes('--videos-only'),
+    imagesOnly: args.includes('--images-only')
   };
 }
 
@@ -30,7 +31,6 @@ function getLatestStoryFolder() {
     .filter(f => {
       const p = path.join(outputDir, f);
       return fs.statSync(p).isDirectory() && 
-             !['images', 'voice_tests', 'ai_images_test'].includes(f) &&
              fs.existsSync(path.join(p, 'story.json'));
     })
     .map(f => ({ name: f, mtime: fs.statSync(path.join(outputDir, f)).mtime }))
@@ -40,20 +40,16 @@ function getLatestStoryFolder() {
 }
 
 /**
- * Process images in parallel batches
+ * Extract search keywords from image prompt
  */
-async function processBatch(tasks, batchSize) {
-  const results = [];
-  for (let i = 0; i < tasks.length; i += batchSize) {
-    const batch = tasks.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch);
-    results.push(...batchResults);
-    
-    if (i + batchSize < tasks.length) {
-      console.log(`   Processed ${Math.min(i + batchSize, tasks.length)}/${tasks.length}...`);
-    }
-  }
-  return results;
+function extractKeywords(imagePrompt) {
+  return imagePrompt
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+    .slice(0, 4)
+    .join(' ');
 }
 
 async function main() {
@@ -61,7 +57,7 @@ async function main() {
   
   if (!options.latest) {
     console.error('❌ Use --latest to specify which story to process');
-    console.error('   Usage: node fetch-images.js --latest [--count N]');
+    console.error('   Usage: node fetch-images.js --latest [--videos-only] [--images-only]');
     process.exit(1);
   }
 
@@ -71,13 +67,7 @@ async function main() {
     process.exit(1);
   }
 
-  const storyPath = path.join(storyFolder, 'story.json');
-  if (!fs.existsSync(storyPath)) {
-    console.error('❌ No story.json found');
-    process.exit(1);
-  }
-
-  const story = JSON.parse(fs.readFileSync(storyPath, 'utf8'));
+  const story = JSON.parse(fs.readFileSync(path.join(storyFolder, 'story.json'), 'utf8'));
   const segments = story.segments || [];
   
   if (segments.length === 0) {
@@ -90,91 +80,135 @@ async function main() {
   fs.mkdirSync(outputDir, { recursive: true });
   fs.mkdirSync(charDir, { recursive: true });
 
-  const totalImages = options.count || segments.length;
-  const toProcess = Math.min(totalImages, segments.length);
+  const totalSegments = options.count || segments.length;
+  const toProcess = Math.min(totalSegments, segments.length);
 
   const characterAnchor = story.characterAnchor || '';
-  const characterShots = segments.filter(s => s.isCharacterShot).length;
+  const characterCount = segments.filter(s => s.isCharacterShot).length;
+  const nonCharacterCount = segments.filter(s => !s.isCharacterShot).length;
 
-  console.log(`\n🎨 Generating images for: ${story.title}`);
-  console.log(`   Segments: ${toProcess}`);
-  console.log(`   Character anchor: "${characterAnchor.substring(0, 50)}..."`);
-  console.log(`   Character shots: ${characterShots}`);
-  console.log(`   Batch size: ${BATCH_SIZE} (parallel)\n`);
+  console.log(`\n🎬 Fetching media for: ${story.title}`);
+  console.log(`   Total segments: ${toProcess}`);
+  console.log(`   Character shots (images): ${characterCount}`);
+  console.log(`   Non-character shots (videos): ${nonCharacterCount}\n`);
 
-  // Build image generation tasks
+  let videosDownloaded = 0;
+  let imagesDownloaded = 0;
+  let failed = 0;
+
+  // Process all segments
   const tasks = [];
-  let charIndex = 0;
 
   for (let i = 0; i < toProcess; i++) {
     const segment = segments[i];
     const isChar = segment.isCharacterShot;
-    const outputPath = path.join(outputDir, `image-${String(i).padStart(3, '0')}.jpg`);
+    const keywords = extractKeywords(segment.imagePrompt || segment.text);
     
-    // Skip if exists and valid
-    if (fs.existsSync(outputPath)) {
-      const stats = fs.statSync(outputPath);
-      if (stats.size > 10000) {
-        console.log(`[${i + 1}/${toProcess}] ✓ Exists: image-${String(i).padStart(3, '0')}.jpg`);
-        continue;
-      }
-    }
-
-    // Build prompt: prepend character anchor for character shots
-    let prompt;
-    if (isChar && characterAnchor) {
-      prompt = `${characterAnchor}, ${segment.imagePrompt || 'dramatic scene'}`;
+    // Determine media type
+    let mediaType;
+    if (options.videosOnly) {
+      mediaType = 'video';
+    } else if (options.imagesOnly) {
+      mediaType = 'image';
     } else {
-      prompt = segment.imagePrompt || `cinematic scene: ${segment.text?.substring(0, 80)}`;
+      mediaType = isChar ? 'image' : 'video';
     }
 
-    // Ensure cinematic style suffix
-    if (!prompt.includes('cinematic')) {
-      prompt += ', cinematic lighting, photorealistic, 4k';
-    }
+    const task = (async () => {
+      const typeLabel = mediaType === 'video' ? '🎬 VIDEO' : '🖼️ IMAGE';
+      console.log(`[${i + 1}/${toProcess}] ${typeLabel}: "${segment.text?.substring(0, 35)}..."`);
+      console.log(`   Keywords: "${keywords}"`);
 
-    const finalPrompt = prompt;
-    const segIndex = i;
-
-    tasks.push((async () => {
-      const type = isChar ? '👤 CHAR' : '🎬 SCENE';
-      console.log(`[${segIndex + 1}/${toProcess}] ${type}: "${segment.text?.substring(0, 35)}..."`);
-      
       try {
-        await generateImageWithFallback(finalPrompt, outputPath, 4);
-        
-        // Also save to character-shots folder
-        if (isChar) {
-          const charPath = path.join(charDir, `char-${String(charIndex).padStart(3, '0')}.jpg`);
-          fs.copyFileSync(outputPath, charPath);
-          charIndex++;
+        if (mediaType === 'video') {
+          // Download video clip for non-character shots
+          const outputPath = path.join(outputDir, `media_${String(i).padStart(3, '0')}.mp4`);
+          
+          // Skip if exists
+          if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 50000) {
+            console.log(`   ✓ Exists (video)`);
+            return { success: true, type: 'video', index: i };
+          }
+
+          // Search and download
+          const result = await searchVideos(keywords, 3);
+          if (!result.videos?.length) {
+            throw new Error('No videos found');
+          }
+
+          // Pick random video
+          const video = result.videos[Math.floor(Math.random() * result.videos.length)];
+          await downloadVideo(video.url, outputPath);
+          
+          console.log(`   ✓ Video: ${video.duration}s by ${video.photographer}`);
+          return { success: true, type: 'video', index: i, duration: video.duration };
+
+        } else {
+          // Download/generate image for character shots
+          const outputPath = path.join(outputDir, `media_${String(i).padStart(3, '0')}.jpg`);
+          
+          // Skip if exists
+          if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 10000) {
+            console.log(`   ✓ Exists (image)`);
+            // Also copy to character-shots
+            if (isChar) {
+              const charPath = path.join(charDir, `char_${String(i).padStart(3, '0')}.jpg`);
+              fs.copyFileSync(outputPath, charPath);
+            }
+            return { success: true, type: 'image', index: i };
+          }
+
+          // Build prompt with character anchor if needed
+          let prompt = segment.imagePrompt || `cinematic scene: ${segment.text?.substring(0, 80)}`;
+          if (isChar && characterAnchor) {
+            prompt = `${characterAnchor}, ${prompt}`;
+          }
+
+          // Try Cloudflare AI first (if quota available), then Pexels
+          try {
+            await generateImage(prompt, outputPath, { steps: 4 });
+            console.log(`   ✓ AI image generated`);
+          } catch (e) {
+            // Fallback to Pexels image
+            const imgResult = await searchImages(keywords + ' dark moody', 3);
+            if (!imgResult.photos?.length) {
+              throw new Error('No images found');
+            }
+            const photo = imgResult.photos[Math.floor(Math.random() * imgResult.photos.length)];
+            await downloadImage(photo.src.large, outputPath);
+            console.log(`   ✓ Pexels image by ${photo.photographer}`);
+          }
+
+          // Also save to character-shots
+          if (isChar) {
+            const charPath = path.join(charDir, `char_${String(i).padStart(3, '0')}.jpg`);
+            fs.copyFileSync(outputPath, charPath);
+          }
+
+          return { success: true, type: 'image', index: i };
         }
-        
-        console.log(`   ✓ Saved`);
-        return { success: true, index: segIndex, isChar };
+
       } catch (e) {
-        console.log(`   ✗ Error: ${e.message.substring(0, 50)}`);
-        return { success: false, index: segIndex, error: e.message };
+        console.log(`   ✗ Error: ${e.message}`);
+        return { success: false, index: i, error: e.message };
       }
-    })());
+    })();
+
+    tasks.push(task);
   }
 
-  // Process all tasks (they're already started as promises)
+  // Run all tasks in parallel
   const results = await Promise.all(tasks);
-  
-  // Stats
-  const success = results.filter(r => r.success).length;
-  const failed = results.filter(r => !r.success).length;
-  const charSaved = results.filter(r => r.success && r.isChar).length;
 
-  const totalImagesFinal = fs.readdirSync(outputDir).filter(f => f.endsWith('.jpg')).length;
-  const totalChars = fs.readdirSync(charDir).filter(f => f.endsWith('.jpg')).length;
+  // Summary
+  const videos = results.filter(r => r.success && r.type === 'video').length;
+  const images = results.filter(r => r.success && r.type === 'image').length;
+  failed = results.filter(r => !r.success).length;
 
   console.log(`\n📊 Summary:`);
-  console.log(`   Generated: ${success}`);
+  console.log(`   Videos: ${videos}`);
+  console.log(`   Images: ${images}`);
   console.log(`   Failed: ${failed}`);
-  console.log(`   Total images: ${totalImagesFinal}`);
-  console.log(`   Character shots saved: ${totalChars}`);
   console.log(`\n✅ Done!\n`);
 }
 

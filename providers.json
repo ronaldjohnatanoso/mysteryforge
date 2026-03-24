@@ -1,20 +1,21 @@
 {
   "providers": {
     "text": {
-      "primary": "cloudflare",
-      "fallback": ["groq", "cerebras"],
+      "primary": "groq",
+      "fallback": ["cerebras"],
       "options": {
-        "cloudflare": {
-          "endpoint": "/text",
-          "model": "@cf/openai/gpt-oss-120b",
-          "max_tokens": 4096
-        },
         "groq": {
-          "model": "llama-3.1-8b-instant",
-          "max_tokens": 4096
+          "model": "llama-3.3-70b-versatile",
+          "max_tokens": 4096,
+          "note": "Fast inference, good for stories"
         },
         "cerebras": {
           "model": "llama-3.3-70b",
+          "max_tokens": 4096
+        },
+        "cloudflare": {
+          "endpoint": "/text",
+          "model": "@cf/openai/gpt-oss-120b",
           "max_tokens": 4096
         }
       }
