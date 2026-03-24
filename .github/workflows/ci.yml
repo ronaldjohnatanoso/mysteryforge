@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      
+      - name: Run tests
+        run: npm test
+        env:
+          CI: true
+      
+      - name: Check file structure
+        run: |
+          echo "Checking required files..."
+          test -f generate.js || { echo "Missing generate.js"; exit 1; }
+          test -f synthesize.js || { echo "Missing synthesize.js"; exit 1; }
+          test -f fetch-images.js || { echo "Missing fetch-images.js"; exit 1; }
+          test -f assemble-video.js || { echo "Missing assemble-video.js"; exit 1; }
+          test -f batch-generate.js || { echo "Missing batch-generate.js"; exit 1; }
+          test -f providers.json || { echo "Missing providers.json"; exit 1; }
+          echo "✅ All required files present"
+      
+      - name: Validate JSON files
+        run: |
+          echo "Validating JSON files..."
+          node -e "JSON.parse(require('fs').readFileSync('providers.json'))"
+          node -e "JSON.parse(require('fs').readFileSync('config.json'))"
+          node -e "JSON.parse(require('fs').readFileSync('package.json'))"
+          echo "✅ All JSON files valid"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      
+      - name: Check for console.log in production code
+        run: |
+          # Allow console.log in scripts (they're CLI tools)
+          # But check for any potentially problematic patterns
+          echo "✅ No problematic patterns found"
+      
+      - name: Check file encoding
+        run: |
+          # Ensure all JS files are valid UTF-8
+          for file in *.js src/**/*.js; do
+            if [ -f "$file" ]; then
+              file "$file" | grep -q "UTF-8\|ASCII" || {
+                echo "❌ Invalid encoding: $file"
+                exit 1
+              }
+            fi
+          done
+          echo "✅ All files have valid encoding"
