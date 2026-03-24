@@ -5,6 +5,8 @@
   "main": "generate.js",
   "scripts": {
     "generate": "node generate.js",
+    "batch": "node batch-generate.js",
+    "batch:all": "node batch-generate.js --all-genres",
     "synthesize": "node synthesize.js",
     "images": "node fetch-images.js --latest",
     "images:ai": "node fetch-images.js --latest --gemini",

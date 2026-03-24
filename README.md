@@ -58,6 +58,7 @@ node assemble-video.js --latest
 | Command | Description | Options |
 |---------|-------------|---------|
 | `node generate.js` | Generate story script | `--genre`, `--length`, `--provider`, `--topic` |
+| `node batch-generate.js` | Generate multiple stories | `--count`, `--all-genres`, `--length`, `--delay` |
 | `node synthesize.js` | Text-to-speech synthesis | `--voice`, `--speed` |
 | `node fetch-images.js --latest` | Fetch images | `--gemini`, `--ai`, `--pexels`, `--count` |
 | `node assemble-video.js --latest` | Assemble video | `--no-subs` |
@@ -65,7 +66,9 @@ node assemble-video.js --latest
 ### npm Scripts
 
 ```bash
-npm run generate    # Generate story
+npm run generate    # Generate single story
+npm run batch       # Generate 5 stories (default)
+npm run batch:all   # Generate 1 story per genre (4 total)
 npm run synthesize  # Synthesize voice
 npm run images      # Fetch Pexels images
 npm run images:ai   # Fetch AI images (Gemini)
@@ -73,6 +76,31 @@ npm run assemble    # Assemble video
 npm run build       # Full pipeline
 npm test            # Run tests
 ```
+
+### Batch Generation
+
+Generate multiple stories at once with quality scoring:
+
+```bash
+# Generate 5 random stories
+node batch-generate.js --count 5
+
+# Generate 3 revenge stories, 3 minutes each
+node batch-generate.js --genre revenge --count 3 --length 3
+
+# Generate one story per genre (4 total)
+node batch-generate.js --all-genres
+
+# With custom delay between requests (avoid rate limits)
+node batch-generate.js --count 10 --delay 3000
+```
+
+Each batch generates a report with quality scores (A-D grade) based on:
+- Structure completeness
+- Segment length (target: 20-30 words)
+- Character shot ratio (target: 15-25%)
+- Hook match
+- Total word count
 
 ## Story Genres
 

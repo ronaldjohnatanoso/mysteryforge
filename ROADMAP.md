@@ -54,8 +54,8 @@ async function synthesizeVoice(script, voiceId) {
 ## Phase 4: Full Automation (In Progress)
 - [x] Cloudflare Worker backend (unified API for text, image, TTS)
 - [x] Provider fallback system (Cloudflare → Groq/Cerebras → Pexels/Pollinations)
-- [ ] Batch generation (generate 10 scripts at once)
-- [ ] Quality scoring (hook strength, engagement predictions)
+- [x] Batch generation (generate multiple stories at once)
+- [x] Quality scoring (hook strength, engagement predictions)
 - [ ] Schedule queue (plan content calendar)
 - [ ] Auto-upload to YouTube (YouTube Data API)
 - [ ] Analytics feedback loop
@@ -133,6 +133,17 @@ mysteryforge/
 ---
 
 ## Changelog
+
+### v1.3.0 (2026-03-24)
+- Added batch generation (batch-generate.js) for multiple stories at once
+- Added quality scoring system (A-D grade) for generated stories
+- Enhanced story prompts with detailed templates and quality control rules
+- Added new topic variants: stalker, possession, family-revenge, betrayal, crime
+- Updated primary LLM to llama-3.3-70b-versatile (better quality)
+- Added video clip support in fetch-images.js and assemble-video.js
+- Reordered provider fallback: Groq → Cerebras → Cloudflare
+- Fixed test suite for incomplete generation states
+- Updated documentation with batch generation examples
 
 ### v1.2.0 (2026-03-23)
 - Added Cloudflare Worker backend integration (text, image, TTS, transcription)
