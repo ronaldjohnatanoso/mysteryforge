@@ -3,8 +3,10 @@
 /**
  * MysteryForge Speech Synthesis
  * 
- * Uses Cloudflare Worker for TTS (Deepgram Aura).
- * Free, high quality, multiple voices.
+ * Uses Kokoro TTS (82M params, local neural voice).
+ * High quality, multiple voices, runs on localhost:5002.
+ * 
+ * Fallback: Google Translate TTS via gtts package.
  */
 
 const fs = require('fs');

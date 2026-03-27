@@ -64,7 +64,7 @@ output/
 ## Current Voice Settings
 - **Engine:** Kokoro (82M params neural TTS)
 - **Default voice:** `af_sky`
-- **Speed:** 0.85
+- **Speed:** 0.7
 
 ## Video Settings
 - **Resolution:** 1920x1080 (Full HD)

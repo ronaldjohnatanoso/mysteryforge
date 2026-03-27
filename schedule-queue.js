@@ -33,7 +33,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { generateText } = require('./src/providers/index.js');
 
 const QUEUE_FILE = path.join(__dirname, 'output', 'schedule-queue.json');
 
