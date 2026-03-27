@@ -11,7 +11,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { generateText, generateImage, generateSpeech, wordsToSRT } = require('./src/worker-client');
+const { generateText, generateImage, wordsToSRT } = require('./src/worker-client');
+const { generateSpeech } = require('./src/providers/index.js'); // Kokoro local TTS (default)
 
 const SECONDS_PER_SEGMENT = 8;
 
@@ -21,7 +22,7 @@ function parseArgs() {
     genre: args.includes('--genre') ? args[args.indexOf('--genre') + 1] : 'revenge',
     length: args.includes('--length') ? parseInt(args[args.indexOf('--length') + 1]) : 2,
     topic: args.includes('--topic') ? args[args.indexOf('--topic') + 1] : null,
-    voice: args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'orion'
+    voice: args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'af_sky'  // Kokoro voices: af_sky, af_heart, am_michael, etc.
   };
 }
 

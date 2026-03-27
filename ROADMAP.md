@@ -57,7 +57,7 @@ async function synthesizeVoice(script, voiceId) {
 - [x] Batch generation (generate multiple stories at once)
 - [x] Quality scoring (hook strength, engagement predictions)
 - [x] YouTube upload script (OAuth-based, requires setup)
-- [ ] Schedule queue (plan content calendar)
+- [x] Schedule queue (plan content calendar)
 - [ ] Full YouTube API integration (install googleapis package)
 - [ ] Analytics feedback loop
 
