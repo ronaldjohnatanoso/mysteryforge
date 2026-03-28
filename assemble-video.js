@@ -97,12 +97,15 @@ function generateSRT(text, duration) {
 }
 
 /**
- * Build video filter with support for mixed video/image inputs
+ * Build video filter with support for mixed video/image inputs.
+ * Ken Burns (zoompan) is applied ONLY to character shots, not B-roll.
+ * Character shot indices come from story.json segments[].isCharacterShot.
  */
-function buildVideoFilter(mediaFiles, segments, duration) {
+function buildVideoFilter(mediaFiles, charShotIndices, duration) {
   const fileCount = mediaFiles.length;
   const durationPerSegment = duration / fileCount;
   const framesPerSegment = Math.round(durationPerSegment * 30);
+  const charSet = new Set(charShotIndices);
   
   const inputs = [];
   let filterComplex = '';
@@ -110,18 +113,21 @@ function buildVideoFilter(mediaFiles, segments, duration) {
   for (let i = 0; i < fileCount; i++) {
     const file = mediaFiles[i];
     const isVideo = file.endsWith('.mp4');
+    const isChar = !isVideo && charSet.has(i);
     
     if (isVideo) {
-      // Video file: trim to segment duration
+      // Video file (B-roll): trim, scale, fps — no Ken Burns (already moving)
       inputs.push(`-t ${durationPerSegment.toFixed(2)} -i "${file}"`);
-      
-      // Scale and set fps for consistent output
       filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v${i}];`;
-    } else {
-      // Image file: apply zoompan
+    } else if (isChar) {
+      // Character shot image: apply Ken Burns (zoompan) effect
       inputs.push(`-loop 1 -t ${durationPerSegment.toFixed(2)} -i "${file}"`);
-      
-      // Simple scale (faster encoding)
+      const effect = CHARACTER_EFFECTS[i % CHARACTER_EFFECTS.length]
+        .replace('{frames}', framesPerSegment);
+      filterComplex += `[${i}:v]${effect}[v${i}];`;
+    } else {
+      // B-roll image fallback: simple scale, no Ken Burns
+      inputs.push(`-loop 1 -t ${durationPerSegment.toFixed(2)} -i "${file}"`);
       filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${i}];`;
     }
   }
@@ -160,9 +166,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Get media files (videos and images, sorted)
+  // Get media files (videos and images, sorted) — supports both media_* and img_* naming
   const mediaFiles = fs.readdirSync(imagesDir)
-    .filter(f => f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.mp4'))
+    .filter(f => (f.startsWith('media_') || f.startsWith('img_')) && (f.endsWith('.jpg') || f.endsWith('.png') || f.endsWith('.mp4')))
     .sort()
     .map(f => path.join(imagesDir, f));
 
@@ -175,20 +181,27 @@ async function main() {
   const videoCount = mediaFiles.filter(f => f.endsWith('.mp4')).length;
   const imageCount = mediaFiles.filter(f => !f.endsWith('.mp4')).length;
 
-  // Load story.json for segment info
+  // Load story.json for segment info + character shot indices
   let segments = [];
   if (fs.existsSync(storyPath)) {
     const story = JSON.parse(fs.readFileSync(storyPath, 'utf8'));
     segments = story.segments || [];
   }
 
+  // Character shot indices: only applies to images (not B-roll videos)
+  // Match media files to segments by index
+  const charShotIndices = [];
+  for (let i = 0; i < segments.length; i++) {
+    if (segments[i]?.isCharacterShot) charShotIndices.push(i);
+  }
+
   const duration = getDuration(audioPath);
-  const charShots = segments.filter(s => s.isCharacterShot).length;
+  const charShots = charShotIndices.length;
 
   console.log(`   Duration: ${duration.toFixed(1)}s`);
   console.log(`   Media files: ${mediaFiles.length}`);
-  console.log(`   Videos: ${videoCount}, Images: ${imageCount}`);
-  console.log(`   Character shots: ${charShots}`);
+  console.log(`   Videos (B-roll): ${videoCount}, Images: ${imageCount}`);
+  console.log(`   Character shots (Ken Burns): ${charShots}`);
 
   const outputPath = path.join(storyFolder, 'video.mp4');
   const tempOutput = path.join(storyFolder, 'video_temp.mp4');
@@ -203,8 +216,8 @@ async function main() {
 
   console.log('\n   Building video...');
 
-  // Build filter with mixed video/image support
-  const { inputs, filterComplex } = buildVideoFilter(mediaFiles, segments, duration);
+  // Build filter: Ken Burns only on character shots, standard scaling on B-roll
+  const { inputs, filterComplex } = buildVideoFilter(mediaFiles, charShotIndices, duration);
 
   // Run ffmpeg
   const cmd = `${FFMPEG} -y ${inputs} -i "${audioPath}" \

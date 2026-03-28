@@ -28,7 +28,8 @@
     "build:full": "npm run build && npm run platforms",
     "test": "node tests/test-suite.js",
     "test:providers": "node tests/providers.test.js",
-    "test:generate": "node tests/generate.test.js"
+    "test:generate": "node tests/generate.test.js",
+    "test:broll": "node tests/broll.test.js"
   },
   "keywords": [
     "mystery",

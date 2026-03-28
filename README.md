@@ -140,16 +140,34 @@ node generate.js --genre revenge --topic workplace-revenge
 ```
 output/
 └── <story_title>/
-    ├── story.json        # Structured data with segments
+    ├── story.json        # Structured data with segments + isCharacterShot flags
     ├── narration.txt     # Clean text for TTS
     ├── narration.mp3     # Synthesized audio
-    ├── images/           # Story images
-    │   ├── img_000.jpg
-    │   ├── img_001.jpg
+    ├── images/           # Story media (B-roll + character shots)
+    │   ├── media_000.mp4  # B-roll video clip
+    │   ├── media_001.mp4  # B-roll video clip
+    │   ├── media_002.jpg  # Character shot (Ken Burns applied)
+    │   └── ...
+    ├── thumbnails/       # Thumbnail candidates
+    │   ├── thumb_01.jpg
     │   └── ...
     ├── subtitles.srt     # Generated subtitles
     └── video.mp4         # Final video
 ```
+
+## B-roll Video Pipeline
+
+The `pipeline.js` script fetches **real B-roll video clips** from Pexels for ~80% of segments (atmospheric footage), and **AI-generated character shots** (via Cloudflare/Gemini/Pollinations) for ~20% of segments. Ken Burns effects are applied only to character shots during video assembly.
+
+```bash
+# Full pipeline: story → B-roll + TTS → thumbnails → ready for assembly
+node pipeline.js --genre mystery --length 3
+
+# Then assemble the final video
+node assemble-video.js --latest
+```
+
+This replaces the older workflow of fetching only still images (`fetch-images.js`).
 
 ## API Keys
 
@@ -178,9 +196,10 @@ FFMPEG_PATH=~/.local/bin/ffmpeg
 
 ## Video Features
 
-- **Ken Burns Effects**: Subtle zoom and pan for visual interest
-- **Crossfade Transitions**: Smooth transitions between images
-- **Auto Subtitles**: SRT generation with word-level timing
+- **B-roll Video Clips**: Real Pexels video footage for atmospheric scenes (~80% of segments)
+- **AI Character Shots**: Generated images for close-up character moments (~20% of segments)
+- **Ken Burns Effects**: Applied only to AI character shots for cinematic feel
+- **Auto Subtitles**: SRT generation from narration text
 - **Color Grading**: Genre-specific color grades (thriller, horror, noir)
 - **Platform Templates**: Auto-resize for YouTube, TikTok, Instagram, Twitter
 

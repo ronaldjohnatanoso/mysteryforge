@@ -11,8 +11,19 @@
 
 const fs = require('fs');
 const path = require('path');
+
+// Load credentials env
+try {
+  const envFile = fs.readFileSync('/home/ronald/credentials/.env', 'utf8');
+  envFile.split('\n').forEach(line => {
+    const [k, ...rest] = line.split('=');
+    if (k && rest.length) process.env[k.trim()] = rest.join('=').trim();
+  });
+} catch (e) { /* credentials env not found */ }
+
 const { generateText, generateImage, wordsToSRT } = require('./src/worker-client');
 const { generateSpeech } = require('./src/providers/index.js'); // Kokoro local TTS (default)
+const { searchVideos, downloadVideo, searchImages, downloadImage } = require('./src/images/fetcher.js');
 
 const SECONDS_PER_SEGMENT = 8;
 
@@ -57,6 +68,25 @@ function generateImagePrompt(text, genre) {
   return `${keywords}, ${styles[genre] || styles.mystery}, cinematic lighting, photorealistic, 4k`;
 }
 
+function extractKeywords(text) {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+    .slice(0, 4)
+    .join(' ');
+}
+
+// Genre-safe B-roll fallback keywords (Pexels won't flag these)
+const BROLL_FALLBACK = {
+  mystery: 'dark forest fog',
+  horror: 'old house night',
+  revenge: 'corporate office building',
+  confession: 'dimly lit room shadows',
+  default: 'dramatic atmosphere dark'
+};
+
 async function main() {
   const opts = parseArgs();
   const startTime = Date.now();
@@ -88,7 +118,13 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   // Clean and split
   const cleaned = storyText.replace(/\[.*?\]/g, '').replace(/^"|"$/g, '').trim();
   const segmentTexts = splitIntoSegments(cleaned);
-  const segments = segmentTexts.map(text => ({ text, image_prompt: generateImagePrompt(text, opts.genre) }));
+  // Mark character shots: ~20% of segments (every 5th, skipping first)
+  const isCharacter = (i, total) => Math.floor((i / total) * 5) % 5 === 0 && i > 0;
+  const segments = segmentTexts.map((text, i) => ({
+    text,
+    image_prompt: generateImagePrompt(text, opts.genre),
+    isCharacterShot: isCharacter(i, segmentTexts.length)
+  }));
   const title = cleaned.split(/[.!?]/)[0].split(' ').slice(0, 6).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '') || `story_${Date.now()}`;
   
   // Create output folder
@@ -110,14 +146,67 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   console.log(`   ✅ ${segments.length} segments, ${storyData.total_words} words`);
   console.log(`   📁 ${folder}\n`);
   
-  // ===== STEP 2: Images + TTS in parallel =====
-  console.log('🎨 Generating images + audio in parallel...');
+  // ===== STEP 2: Media (B-roll + character images) + TTS in parallel =====
+  // ~20% of segments are character shots (AI-generated images)
+  // ~80% are B-roll (Pexels video clips)
+  console.log('🎬 Fetching B-roll + character media in parallel...');
   
-  const imageTasks = segments.map((seg, i) => {
-    const outputPath = path.join(folder, 'images', `img_${String(i).padStart(3, '0')}.jpg`);
-    return generateImage(seg.image_prompt, outputPath, 4)
-      .then(() => ({ success: true, index: i }))
-      .catch(e => ({ success: false, index: i, error: e.message }));
+  const mediaTasks = segments.map(async (seg, i) => {
+    const char = seg.isCharacterShot;
+    const keywords = extractKeywords(seg.text);
+    
+    if (char) {
+      // Character shot: AI-generated image
+      const outputPath = path.join(folder, 'images', `media_${String(i).padStart(3, '0')}.jpg`);
+      try {
+        await generateImage(seg.image_prompt, outputPath, 4);
+        return { success: true, index: i, type: 'image', isCharacter: true };
+      } catch (e) {
+        return { success: false, index: i, error: e.message, type: 'image' };
+      }
+    } else {
+      // B-roll: Pexels video clip + Pexels image fallback
+      const videoPath = path.join(folder, 'images', `media_${String(i).padStart(3, '0')}.mp4`);
+      const imagePath = path.join(folder, 'images', `media_${String(i).padStart(3, '0')}.jpg`);
+      const safeKeyword = BROLL_FALLBACK[opts.genre] || BROLL_FALLBACK.default;
+      try {
+        const result = await searchVideos(keywords, 3);
+        if (result.videos?.length) {
+          const video = result.videos[Math.floor(Math.random() * result.videos.length)];
+          await downloadVideo(video.url, videoPath);
+          return { success: true, index: i, type: 'video', duration: video.duration };
+        }
+        // No videos found — try safe fallback keyword
+        const fallbackResult = await searchVideos(safeKeyword, 3);
+        if (fallbackResult.videos?.length) {
+          const video = fallbackResult.videos[Math.floor(Math.random() * fallbackResult.videos.length)];
+          await downloadVideo(video.url, videoPath);
+          return { success: true, index: i, type: 'video', duration: video.duration };
+        }
+      } catch (e) {
+        // Try safe fallback on error too
+        try {
+          const fallbackResult = await searchVideos(safeKeyword, 3);
+          if (fallbackResult.videos?.length) {
+            const video = fallbackResult.videos[Math.floor(Math.random() * fallbackResult.videos.length)];
+            await downloadVideo(video.url, videoPath);
+            return { success: true, index: i, type: 'video', duration: video.duration };
+          }
+        } catch (e2) { /* silence */ }
+      }
+      // Fallback: try Pexels image
+      try {
+        const imgResult = await searchImages(safeKeyword, 3);
+        if (imgResult.photos?.length) {
+          const photo = imgResult.photos[Math.floor(Math.random() * imgResult.photos.length)];
+          await downloadImage(photo.src.large, imagePath);
+          return { success: true, index: i, type: 'image' };
+        }
+      } catch (e2) {
+        return { success: false, index: i, error: 'No video or image found', type: 'image' };
+      }
+      return { success: false, index: i, error: 'Search failed', type: 'image' };
+    }
   });
   
   const ttsTask = generateSpeech(cleaned, path.join(folder, 'narration.mp3'), opts.voice)
@@ -126,17 +215,19 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   
   // Run all in parallel
   const parallelStart = Date.now();
-  const [imageResults, ttsResult] = await Promise.all([
-    Promise.all(imageTasks),
+  const [mediaResults, ttsResult] = await Promise.all([
+    Promise.all(mediaTasks),
     ttsTask
   ]);
   const parallelTime = ((Date.now() - parallelStart) / 1000).toFixed(1);
   
-  const imagesOk = imageResults.filter(r => r.success).length;
-  const imagesFail = imageResults.filter(r => !r.success).length;
+  const videosOk = mediaResults.filter(r => r.success && r.type === 'video').length;
+  const imagesOk = mediaResults.filter(r => r.success && r.type === 'image').length;
+  const mediaFail = mediaResults.filter(r => !r.success).length;
   
-  console.log(`   ✅ Images: ${imagesOk}/${segments.length} in ${parallelTime}s`);
-  if (imagesFail) console.log(`   ❌ Failed: ${imagesFail}`);
+  console.log(`   ✅ Videos (B-roll): ${videosOk}`);
+  console.log(`   ✅ Images (character): ${imagesOk}`);
+  if (mediaFail) console.log(`   ❌ Failed: ${mediaFail}`);
   
   if (ttsResult.success) {
     console.log(`   ✅ Audio: ${(ttsResult.size / 1024).toFixed(0)}KB`);
@@ -154,7 +245,7 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     
     // Pick 3 evenly distributed images for thumbnails
     const imageFiles = fs.readdirSync(path.join(folder, 'images'))
-      .filter(f => f.endsWith('.jpg') || f.endsWith('.png'))
+      .filter(f => (f.startsWith('media_') || f.startsWith('img_')) && (f.endsWith('.jpg') || f.endsWith('.png')))
       .sort();
     
     if (imageFiles.length > 0) {
