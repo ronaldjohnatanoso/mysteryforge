@@ -322,6 +322,51 @@ test('youtube-upload.js generates correct metadata', () => {
 });
 
 // ============================================
+// SEO OPTIMIZER TESTS
+// ============================================
+
+console.log('\n🔍 SEO Optimizer Tests\n');
+
+test('seo/optimizer.js exports SEOOptimizer class', () => {
+  const { SEOOptimizer } = require('../src/seo/optimizer');
+  assert(typeof SEOOptimizer === 'function', 'SEOOptimizer should be a constructor');
+});
+
+test('seo/optimizer.js generates optimized title', () => {
+  const { SEOOptimizer } = require('../src/seo/optimizer');
+  const optimizer = new SEOOptimizer({ genre: 'mystery', story: 'Test story about a dark secret', segments: [{ text: 'Test segment' }] });
+  const seo = optimizer.optimize();
+  assert(seo.title.length > 0, 'Title should not be empty');
+  assert(seo.title.length <= 100, 'Title should be <= 100 chars');
+});
+
+test('seo/optimizer.js generates description with CTA', () => {
+  const { SEOOptimizer } = require('../src/seo/optimizer');
+  const optimizer = new SEOOptimizer({ genre: 'mystery', story: 'Test story', segments: [{ text: 'Test' }] });
+  const seo = optimizer.optimize();
+  const ctas = ['Subscribe', 'Like', 'Comment', 'Watch'];
+  const hasCta = ctas.some(c => seo.description.includes(c));
+  assert(hasCta, 'Description should include a call-to-action');
+});
+
+test('seo/optimizer.js generates genre-specific tags', () => {
+  const { SEOOptimizer } = require('../src/seo/optimizer');
+  const genres = ['mystery', 'horror', 'revenge', 'confession'];
+  for (const genre of genres) {
+    const optimizer = new SEOOptimizer({ genre, story: 'Test story', segments: [] });
+    const seo = optimizer.optimize();
+    assert(seo.tags.includes(genre), `Tags should include ${genre}`);
+  }
+});
+
+test('youtube-upload.js uses SEO optimizer with --use-seo flag', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../youtube-upload.js'), 'utf8');
+  assert(script.includes('SEOOptimizer'), 'SEOOptimizer should be imported');
+  assert(script.includes('--use-seo'), '--use-seo flag should exist');
+  assert(script.includes('opts.useSeo'), 'useSeo option should be used');
+});
+
+// ============================================
 // THUMBNAIL GENERATOR TESTS
 // ============================================
 

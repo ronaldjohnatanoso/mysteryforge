@@ -12,7 +12,8 @@ Automated YouTube content factory for fictional mystery, horror, revenge, and co
 - 📝 **Auto Subtitles**: SRT generation from narration text
 - 📱 **Platform Templates**: Auto-create variants for YouTube, TikTok, Instagram, Twitter
 - 🖼️ **Thumbnail Generation**: Extract key frames for video thumbnails
-- 📤 **YouTube Upload**: OAuth-based upload script (requires setup)
+- 📤 **YouTube Upload**: OAuth-based upload with googleapis (resumable uploads)
+- 🔍 **SEO Optimization**: Auto-generate click-worthy titles, descriptions, and tags
 - 🔒 **Security-First**: CI/CD secret scanning, pre-commit hooks
 
 ## Quick Start
@@ -242,6 +243,23 @@ node youtube-upload.js --latest
 
 # Upload as public
 node youtube-upload.js --latest --public
+
+# Upload with SEO-optimized title, description, and tags
+node youtube-upload.js --latest --use-seo
+```
+
+### SEO Optimization
+
+Generate click-worthy YouTube metadata for maximum engagement:
+
+```bash
+# Generate and preview SEO-optimized metadata
+node src/seo/optimizer.js --latest
+
+# The SEO module creates:
+# - Click-worthy titles with template patterns
+# - Engaging descriptions with hooks and CTAs
+# - Genre-specific tags for discoverability
 ```
 
 ### Setup Instructions
@@ -278,10 +296,12 @@ chmod +x .git/hooks/pre-commit
 - [x] Phase 1: Script generation (multiple genres, LLM providers)
 - [x] Phase 2: Voice synthesis (Kokoro neural TTS)
 - [x] Phase 3: Visual assembly (Pexels + AI images, FFmpeg)
-- [x] Phase 4: Full automation & YouTube upload
-  - [x] Schedule queue (content calendar) ← NEW
+- [x] Phase 4: Full automation (YouTube API, SEO, schedule queue)
+  - [x] YouTube upload with googleapis (resumable uploads)
+  - [x] SEO optimization (titles, descriptions, tags)
+  - [x] Schedule queue (content calendar)
   - [ ] Analytics feedback loop
-- [ ] Phase 5: Scaling (multi-channel, trending topics, SEO)
+- [ ] Phase 5: Scaling (multi-channel, trending topics, community bot)
 
 ## Contributing
 

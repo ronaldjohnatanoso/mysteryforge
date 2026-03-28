@@ -1,6 +1,6 @@
 {
   "name": "mysteryforge",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Automated fictional mystery/crime story generator for YouTube content",
   "main": "generate.js",
   "scripts": {
@@ -17,6 +17,8 @@
     "platforms:tiktok": "node platform-templates.js --latest --tiktok",
     "upload": "node youtube-upload.js --latest",
     "upload:public": "node youtube-upload.js --latest --public",
+    "upload:seo": "node youtube-upload.js --latest --use-seo",
+    "optimize": "node src/seo/optimizer.js --latest",
     "pipeline": "node pipeline.js",
     "schedule": "node schedule-queue.js",
     "schedule:add": "node schedule-queue.js --add",
@@ -24,6 +26,7 @@
     "schedule:due": "node schedule-queue.js --due",
     "schedule:run": "node schedule-queue.js --run",
     "test:schedule": "node tests/schedule-queue.test.js",
+    "test:seo": "node tests/seo.test.js",
     "build": "npm run generate && npm run synthesize && npm run images && npm run assemble && npm run thumbnails",
     "build:full": "npm run build && npm run platforms",
     "test": "node tests/test-suite.js",
@@ -55,6 +58,8 @@
   "homepage": "https://github.com/ronaldjohnatanoso/mysteryforge#readme",
   "dependencies": {
     "edge-tts": "^1.0.1",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^171.4.0",
     "gtts": "^0.2.1",
     "node-fetch": "^3.3.2"
   },
