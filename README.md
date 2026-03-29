@@ -68,7 +68,7 @@ node platform-templates.js --latest --all
 
 | Command | Description | Options |
 |---------|-------------|---------|
-| `node generate.js` | Generate story script | `--genre`, `--length`, `--provider`, `--topic` |
+| `node generate.js` | Generate story script | `--prompt`, `--length`, `--voice`, `--interactive` |
 | `node batch-generate.js` | Generate multiple stories | `--count`, `--all-genres`, `--length`, `--delay` |
 | `node synthesize.js` | Text-to-speech synthesis | `--voice`, `--speed` |
 | `node fetch-images.js --latest` | Fetch images | `--gemini`, `--ai`, `--pexels`, `--count` |

@@ -1,103 +1,143 @@
 #!/usr/bin/env node
 
 /**
- * MysteryForge Story Generator v2
+ * MysteryForge Story Generator v3
  * 
- * Generates structured stories with:
- * - characterAnchor: detailed character description for consistency
- * - segments with imagePrompt and isCharacterShot flags
+ * Fully prompt-driven story generation.
+ * No more hardcoded genres — just tell it what story you want.
  * 
- * Output: story.json with full structured data
+ * Usage:
+ *   node generate.js "a story about a detective hunting a cannibal in 1920s Chicago"
+ *   node generate.js --prompt "..." [--length 2] [--voice af_sky]
+ *   node generate.js --interactive
  */
 
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const { generateText: generateTextWithFallback } = require('./src/providers/index.js');
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  return {
-    genre: args.includes('--genre') ? args[args.indexOf('--genre') + 1] : 'mystery',
-    length: args.includes('--length') ? parseInt(args[args.indexOf('--length') + 1]) : 2,
-    topic: args.includes('--topic') ? args[args.indexOf('--topic') + 1] : null,
-    listGenres: args.includes('--list-genres')
+  const opts = {
+    prompt: null,
+    length: 2,
+    voice: 'af_sky',
+    interactive: false,
+    listVoices: false
   };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--prompt' || arg === '-p') {
+      opts.prompt = args[++i];
+    } else if (arg === '--length' || arg === '-l') {
+      opts.length = parseInt(args[++i]) || 2;
+    } else if (arg === '--voice' || arg === '-v') {
+      opts.voice = args[++i] || 'af_sky';
+    } else if (arg === '--interactive' || arg === '-i') {
+      opts.interactive = true;
+    } else if (arg === '--list-voices') {
+      opts.listVoices = true;
+    } else if (!arg.startsWith('-')) {
+      // Positional argument — treat as the story prompt
+      opts.prompt = arg;
+    }
+  }
+
+  return opts;
 }
 
-const GENRES = {
-  mystery: {
-    name: 'Mystery',
-    topics: [
-      { type: 'internet-mystery', prompt: 'A deleted website with disturbing content', hook: 'There was a website that only existed for 47 minutes...' },
-      { type: 'found-footage', prompt: 'A camcorder found in an abandoned location', hook: 'The tape was labeled "DO NOT WATCH" in red marker...' },
-      { type: 'disappearance', prompt: 'Someone who vanished and left strange clues', hook: 'She left her phone, wallet, and keys on the kitchen table...' },
-      { type: 'stalker', prompt: 'Someone watching from the shadows', hook: 'The photos were taken from inside my house...' }
-    ],
-    characterDefault: 'shadowy mysterious figure in dark cloak, face hidden, tall thin silhouette, ominous presence, gothic style'
-  },
-  revenge: {
-    name: 'Revenge Story',
-    topics: [
-      { type: 'workplace-revenge', prompt: 'Employee gets back at terrible boss', hook: 'My boss didn\'t know I\'d seen the promotion letter with MY name on it...' },
-      { type: 'neighbor-revenge', prompt: 'Dealing with nightmare neighbor', hook: 'My neighbor parked in my spot for the 47th time. This time, I was ready...' },
-      { type: 'ex-revenge', prompt: 'Ex partner gets karma', hook: 'My ex thought keeping my dog was acceptable...' },
-      { type: 'family-revenge', prompt: 'Family member who wronged you', hook: 'My sister stole my inheritance. She didn\'t know I had a plan...' }
-    ],
-    characterDefault: 'confident protagonist in business attire, determined expression, sharp features, professional look'
-  },
-  horror: {
-    name: 'Horror',
-    topics: [
-      { type: 'monster', prompt: 'Something in the dark', hook: 'I heard it scratching at my door at 3am...' },
-      { type: 'haunting', prompt: 'Ghostly encounters', hook: 'The previous owners died in this house. They never left...' },
-      { type: 'creature', prompt: 'Encounter with unknown entity', hook: 'We found something in the woods. It found us first...' },
-      { type: 'possession', prompt: 'Something took control', hook: 'My daughter hasn\'t been the same since the accident...' }
-    ],
-    characterDefault: 'terrified victim, wide eyes, disheveled appearance, fear expression, horror movie style'
-  },
-  confession: {
-    name: 'Confession',
-    topics: [
-      { type: 'secret-life', prompt: 'Living a double life', hook: 'Nobody knows who I really am. Not even my wife...' },
-      { type: 'dark-secret', prompt: 'Something I can never tell anyone', hook: 'I\'ve kept this secret for 15 years. I need to tell someone...' },
-      { type: 'crime', prompt: 'Anonymous crime confession', hook: 'They never found the body. They never will...' },
-      { type: 'betrayal', prompt: 'Betraying someone close', hook: 'My best friend trusted me. I ruined his life...' }
-    ],
-    characterDefault: 'anonymous narrator, silhouette against light, mysterious posture, noir style'
-  }
-};
+async function askQuestion(question) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  return new Promise(resolve => {
+    rl.question(question, answer => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+const KOKORO_VOICES = [
+  // Female voices
+  'af_sky', 'af_heart', 'af_nicole', 'af_sarah', 'af_valor',
+  // Male voices
+  'am_michael', 'am_peter', 'am_alex', 'am_david', 'bf_emma', 'bf_isabella',
+  // Other
+  'bf_leo', 'bm_george', 'bm_lewis', 'pf_sarah', 'pm_michael', 'pm_david'
+];
 
 async function main() {
   const opts = parseArgs();
-  
-  if (opts.listGenres) {
-    console.log('\n📚 Available genres:');
-    Object.entries(GENRES).forEach(([key, g]) => {
-      console.log(`   ${key} - ${g.name}`);
-      console.log(`     Topics: ${g.topics.map(t => t.type).join(', ')}`);
-    });
-    console.log('');
+
+  if (opts.listVoices) {
+    console.log('\n🎤 Available Kokoro voices:');
+    console.log('\nFemale:');
+    KOKORO_VOICES.filter(v => v.startsWith('af') || v.startsWith('bf') || v.startsWith('pf')).forEach(v => console.log(`   ${v}`));
+    console.log('\nMale:');
+    KOKORO_VOICES.filter(v => v.startsWith('am') || v.startsWith('bm') || v.startsWith('pm')).forEach(v => console.log(`   ${v}`));
+    console.log('\nDefault: af_sky\n');
     process.exit(0);
   }
 
-  const genreConfig = GENRES[opts.genre] || GENRES.mystery;
-  const topic = opts.topic 
-    ? genreConfig.topics.find(t => t.type === opts.topic) || genreConfig.topics[0]
-    : genreConfig.topics[Math.floor(Math.random() * genreConfig.topics.length)];
+  if (opts.interactive) {
+    console.log('\n🎭 MysteryForge Interactive Story Generator');
+    console.log('Tell me what story you want. Be as detailed or vague as you like.\n');
+    
+    const storyIdea = await askQuestion('📖 What kind of story do you want? (e.g. "a revenge story about a woman who catches her husband cheating")\n> ');
+    
+    if (!storyIdea.trim()) {
+      console.log('❌ No story provided. Exiting.');
+      process.exit(1);
+    }
+    
+    opts.prompt = storyIdea.trim();
+    
+    const lengthAnswer = await askQuestion('\n⏱️  How long? (1 = ~2min, 2 = ~4min, 3 = ~6min) [default: 2]\n> ');
+    if (lengthAnswer.trim()) {
+      opts.length = parseInt(lengthAnswer.trim()) || 2;
+    }
+    
+    const voiceAnswer = await askQuestion('\n🎤 Voice (or press enter for af_sky):\n> ');
+    if (voiceAnswer.trim()) {
+      opts.voice = voiceAnswer.trim();
+    }
+  }
+
+  if (!opts.prompt) {
+    console.error('\n❌ Usage: node generate.js "your story prompt" [--length 2] [--voice af_sky]');
+    console.error('   Or:   node generate.js --interactive');
+    console.error('   Or:   node generate.js --list-voices');
+    console.error('\nExamples:');
+    console.error('   node generate.js "a mystery about a deleted website that only existed for 47 minutes"');
+    console.error('   node generate.js "ragebait story about workplace revenge"');
+    console.error('   node generate.js "horror story about something in the woods"');
+    console.error('   node generate.js "a confession about living a double life"');
+    console.error('   node generate.js --prompt "whatever story you want" --length 3\n');
+    process.exit(1);
+  }
 
   const wordCount = Math.floor(opts.length * 150 * 1.1);
-  const targetSegments = Math.ceil((opts.length * 60) / 8); // ~8s per segment
+  const targetSegments = Math.ceil((opts.length * 60) / 8);
 
-  console.log(`\n📝 Generating ${opts.genre} story (${opts.length}min, ~${targetSegments} segments)...`);
+  console.log(`\n📝 Generating story...`);
+  console.log(`   Prompt: "${opts.prompt}"`);
+  console.log(`   Length: ${opts.length}min (~${targetSegments} segments)`);
+  console.log(`   Voice: ${opts.voice}`);
 
-  // System prompt for structured JSON output
+  // System prompt — handles ANY story type, infers genre from prompt
   const systemPrompt = `You are a viral YouTube storyteller. You write stories that HOOK viewers and keep them watching.
+You write ANY genre based on what the user requests: mystery, horror, thriller, romance, sci-fi, fantasy, comedy, drama, crime, revenge, confession, etc.
 Output ONLY valid JSON. No markdown. No explanation.
 
 Required schema:
 {
   "title": "short_snake_case_title",
-  "characterAnchor": "visual description of main character",
+  "genre": "inferred genre from prompt",
+  "characterAnchor": "visual description of main character for consistent rendering",
   "segments": [{"id":1,"text":"20-30 word narration","imagePrompt":"scene description","isCharacterShot":false}]
 }
 
@@ -110,130 +150,51 @@ Each segment MUST have 20-30 words. This is critical.
 STORYTELLING RULES:
 
 1. HOOK (first segment):
-   - Start with tension/conflict, not setup
+   - Start with tension/conflict immediately
    - Make viewers NEED to know what happens
-   - Example: "I found my boss's secret journal..." NOT "I worked at a company..."
+   - Drop them into the action, not setup
 
 2. BUILD TENSION:
    - Each segment should raise stakes
    - Use specific details (names, dates, amounts, locations)
-   - Create "oh no" moments that make viewers worry
+   - Create "oh no" moments
    - Plant details early that pay off later
-   - Multiple threads/suspects/theories weaving together
 
 3. TWIST (around 60-70% through):
    - Something unexpected must happen
-   - A revelation, betrayal, or reversal
    - Viewer should think "I didn't see that coming"
-   - Then hit them with ANOTHER twist near the end
 
 4. PACING:
    - Short sentences for tension
-   - Questions without answers
    - End segments on mini-cliffhangers when possible
-   - Every 3-4 segments should have a "wait, WHAT?" moment
 
 5. PAYOFF (final segments):
    - Satisfying resolution
    - Justice served (or ironic punishment)
-   ${opts.genre === 'revenge' ? '- Last segment MUST end with: "Revenge is a dish best served cold."' : ''}
-   - NO "to be continued" or "the nightmare continues" cop-outs
+   - NO "to be continued" cop-outs
 
-6. TECHNICAL:
-   - characterAnchor: detailed visual description
-   - isCharacterShot: true when character appears (~20% of segments)
-   - Each segment MUST be 20-30 words (NOT 5-10 words)
-   - DO NOT make one-sentence segments
-   - Each segment should be a full paragraph of narration
-   - Total: ~${wordCount} words across ~${targetSegments} segments
-   - Start first segment with: "${topic.hook}"
+6. CHARACTER SHOTS:
+   - isCharacterShot: true when the main character appears (~20% of segments)
+   - characterAnchor: detailed visual description for AI image generation
 
 7. QUALITY CONTROL:
-   - NO repetitive phrases ("I felt", "I knew I had to", "I realized")
-   - NO lazy discoveries (stumbling onto evidence by accident)
-   - NO deus ex machina resolutions
+   - NO repetitive phrases
+   - NO lazy discoveries
    - Every segment must ADVANCE THE PLOT
-   - If you're stuck, don't write filler — stop and reconsider the plot
+   - Each segment 20-30 words, full paragraph narration
+   - Total: ~${wordCount} words across ~${targetSegments} segments
 
-BAD: "I felt scared. I didn't know what to do. I decided to investigate."
-GOOD: "The timestamp on the photo read 3:47 AM — two hours after I'd deadbolted the front door. Someone had been inside while I slept."
+TONE: Dark, mature, raw. Real emotions, real consequences, real human darkness. Write for adults.`;
 
-BAD: "I went to work and my boss was mean to me. I decided to get revenge."
-GOOD: "My boss didn't know I'd seen him steal that promotion letter addressed to ME. The one with MY name on it."
+  // User prompt — the free-form story request
+  const userPrompt = `Write a story based on this request: "${opts.prompt}"
 
-Write stories that make people say "and then what happened?!"
+DETECT THE GENRE from the prompt (mystery, horror, thriller, revenge, confession, crime, etc.) and write accordingly.
 
-TONE: Dark, mature, raw. No moralizing. No "and they lived happily ever after." Real emotions, real consequences, real human darkness. Write for adults, not children. Use visceral details, uncomfortable truths, and psychological depth. When someone is betrayed, show the gut-punch — the sleepless nights, the rage, the paranoia. Make it feel REAL.`;
-
-  const userPrompt = `Write a ${opts.genre} story about: ${topic.prompt}
-
-STORY ARC REQUIRED:
-- Hook (start with conflict)
-- Rising action (things get worse)
-- Twist (unexpected turn)
-- Resolution (satisfying payoff)
-
-First segment starts with: "${topic.hook}"
 ~${wordCount} words total in ~${targetSegments} segments.
+Each segment 20-30 words. Full paragraphs, not one-liners.
 
-${opts.genre === 'revenge' ? `
-REVENGE STORY TEMPLATE:
-- Segments 1-3: The wrong (what did they do to you?)
-- Segments 4-6: The planning (how will you get back?)
-- Segments 7-9: The twist (something unexpected happens)
-- Segments 10-12: The execution (revenge happens)
-- Final segment: End with "Revenge is a dish best served cold."
-` : ''}
-
-MYSTERY STORY TEMPLATE:
-- Segments 1-4: The discovery (something deeply wrong, escalate tension)
-- Segments 5-8: Investigation (clues, false leads, paranoia builds)
-- Segments 9-12: Red herring peak (you think you know, but you're wrong)
-- Segments 13-16: The twist (completely unexpected revelation)
-- Segments 17-20: The unraveling (everything connects)
-- Segments 21-24: The dark truth (what really happened, it's worse than you thought)
-- Final segment: Haunting ending — leave viewer unsettled, one detail that changes everything
-
-COMPLEXITY REQUIREMENTS:
-- Multiple suspects/theories (at least 3)
-- Red herrings that feel REAL, not cheap
-- A second twist in the final act
-- One detail planted early that pays off late
-- No "it was all a dream" or "it was the butler"
-- The answer should be surprising but inevitable in hindsight
-- End on a question or reveal that makes viewers want to rewatch
-
-HARD RULES:
-- NO supernatural/scifi elements (no clones, ghosts, aliens, time travel)
-- NO "to be continued" or "the horror was just beginning" endings
-- Every discovery must come from ACTION (investigation, confrontation, searching)
-- Plant at least 3 specific clues early that pay off later
-- The final reveal must recontextualize earlier scenes
-- Each segment must advance the plot — no "I felt scared" filler
-- Use SPECIFIC details: names, dates, amounts, locations, times
-- The villain must have a LOGICAL, BELIEVABLE motive
-
-${opts.genre === 'horror' ? `
-HORROR STORY TEMPLATE:
-- Segments 1-3: The first sign (something is wrong)
-- Segments 4-6: Escalation (it gets worse, you can't escape)
-- Segments 7-9: The confrontation (face the horror)
-- Segments 10-12: The aftermath (did you survive?)
-- Final segment: Chilling twist or lingering dread
-` : ''}
-
-${opts.genre === 'confession' ? `
-CONFESSION STORY TEMPLATE:
-- Segments 1-3: The setup (what led to this)
-- Segments 4-6: The secret (what you did/hide)
-- Segments 7-9: The guilt (how it eats at you)
-- Segments 10-12: The twist (something unexpected about the secret)
-- Final segment: Why you're telling this now
-
-TONE: Raw, unflinching. No redemption arc unless it's earned through pain. Show the ugly truth — jealousy, pettiness, cruelty. Don't sanitize. The best confessions make the viewer uncomfortable because they see themselves in it.
-` : ''}
-
-Output the JSON now.`;
+Output ONLY the JSON. No markdown fences.`;
 
   // Generate story
   let result;
@@ -243,7 +204,7 @@ Output the JSON now.`;
     console.error('❌ Story generation failed:', e.message);
     process.exit(1);
   }
-  
+
   const response = result.text;
   const providerUsed = result.provider;
 
@@ -251,18 +212,16 @@ Output the JSON now.`;
   let storyData;
   try {
     let cleaned = response.trim();
-    // Remove markdown fences if present
     if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
     }
-    // Find JSON object
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) cleaned = jsonMatch[0];
     
     storyData = JSON.parse(cleaned);
   } catch (e) {
     console.error('❌ Failed to parse story JSON:', e.message);
-    console.error('Response preview:', response?.substring(0, 300));
+    console.error('Response preview:', response?.substring(0, 500));
     process.exit(1);
   }
 
@@ -274,18 +233,18 @@ Output the JSON now.`;
 
   // Ensure character anchor exists
   if (!storyData.characterAnchor) {
-    storyData.characterAnchor = genreConfig.characterDefault;
-    console.log('   ⚠️  No characterAnchor, using default');
+    storyData.characterAnchor = 'mysterious figure, cinematic lighting, dramatic pose';
+    console.log('   ⚠️  No characterAnchor in response, using default');
   }
 
   // Ensure title exists and add timestamp
   const now = new Date();
   const timestamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}`;
-  // Format: 2026-03-23_16-09
+  
   if (!storyData.title) {
     storyData.title = `story_${timestamp}`;
   } else {
-    storyData.title = `${storyData.title}_${timestamp}`;
+    storyData.title = `${storyData.title.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}`;
   }
 
   // Add IDs if missing
@@ -305,14 +264,15 @@ Output the JSON now.`;
   fs.mkdirSync(path.join(folder, 'character-shots'), { recursive: true });
 
   // Add metadata
-  storyData.genre = opts.genre;
-  storyData.topic = topic.type;
+  storyData.originalPrompt = opts.prompt;
+  storyData.topic = 'custom';
   storyData.length_minutes = opts.length;
   storyData.total_words = totalWords;
   storyData.segment_count = storyData.segments.length;
   storyData.character_shot_count = characterShots;
   storyData.generated = new Date().toISOString();
   storyData.provider = providerUsed;
+  storyData.voice = opts.voice;
 
   // Save files
   fs.writeFileSync(path.join(folder, 'story.json'), JSON.stringify(storyData, null, 2));
@@ -327,14 +287,17 @@ Output the JSON now.`;
   // Output summary
   console.log(`\n✅ Story generated: ${storyData.title}`);
   console.log(`   📁 ${folder}/`);
+  console.log(`   🎭 Genre: ${storyData.genre || 'custom'}`);
   console.log(`   📝 ${totalWords} words, ${storyData.segments.length} segments`);
   console.log(`   👤 Character shots: ${characterShots} (${Math.round(characterShots/storyData.segments.length*100)}%)`);
-  console.log(`   🎭 Character anchor: "${storyData.characterAnchor.substring(0, 60)}..."\n`);
+  console.log(`   🎤 Voice: ${opts.voice}`);
+  console.log(`   🔊 Provider: ${providerUsed}\n`);
 
   // Preview first segment
-  console.log(`   Segment 1: "${storyData.segments[0].text.substring(0, 50)}..."`);
-  console.log(`   Image prompt: "${storyData.segments[0].imagePrompt?.substring(0, 50)}..."`);
-  console.log(`   Character shot: ${storyData.segments[0].isCharacterShot}\n`);
+  if (storyData.segments[0]) {
+    console.log(`   Segment 1: "${storyData.segments[0].text?.substring(0, 60)}..."`);
+    console.log(`   Image: "${storyData.segments[0].imagePrompt?.substring(0, 50)}..."\n`);
+  }
 }
 
 main().catch(e => { console.error('❌', e.message); process.exit(1); });
