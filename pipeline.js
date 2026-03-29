@@ -68,24 +68,43 @@ function generateImagePrompt(text, genre) {
   return `${keywords}, ${styles[genre] || styles.mystery}, cinematic lighting, photorealistic, 4k`;
 }
 
-function extractKeywords(text) {
-  return text
+/**
+ * Extract visual search terms from an image prompt (not the narration text).
+ * Image prompts are detailed scene descriptions — extract the most visually
+ * searchable nouns/phrases: objects, settings, lighting, emotions visible.
+ */
+function extractVisualTerms(imagePrompt) {
+  // Remove common AI image generation tags/styles to focus on scene content
+  const cleaned = imagePrompt
     .toLowerCase()
+    .replace(/photorealistic|4k|hd|cinematic|film grain|dramatic lighting|volumetric|rule of thirds|glowing|sharp focus|detailed face|medium shot|close-up|long shot|outdoor|indoor|style of|artwork|illustration|sentrifugal|panoramic/g, '')
     .replace(/[^a-z\s]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2)
-    .slice(0, 4)
-    .join(' ');
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Extract key visual terms: nouns, scene elements, emotions visible
+  const words = cleaned.split(/\s+/).filter(w => w.length > 2);
+  
+  // Prioritize: specific objects > scene setting > lighting > mood
+  const visualTerms = [];
+  const objects = ['phone', 'car', 'door', 'house', 'building', 'room', 'street', 'window', 'mirror', 'hand', 'face', 'eyes', 'shadow', 'knife', 'blood', 'letter', 'photo', 'computer', 'tv', 'table', 'bed', 'floor', 'wall', 'sky', 'tree', 'forest', 'road', 'parking', 'office', 'hospital', 'church'];
+  const settings = ['kitchen', 'bathroom', 'bedroom', 'hallway', 'basement', 'attic', 'parking', 'garage', 'restaurant', 'hotel', 'airport', 'school', 'hospital', 'church', 'forest', 'beach', 'bridge', 'alley'];
+  const lighting = ['dark', 'bright', 'dim', 'glowing', 'neon', 'candlelight', 'flashlight', 'moonlight', 'sunset', 'foggy', 'misty'];
+  
+  for (const word of words) {
+    if (objects.includes(word) || settings.includes(word) || lighting.includes(word)) {
+      visualTerms.push(word);
+    }
+  }
+  
+  // If nothing specific found, just use the first few meaningful words
+  if (visualTerms.length === 0) {
+    return words.slice(0, 4).join(' ');
+  }
+  
+  return visualTerms.slice(0, 4).join(' ');
 }
 
-// Genre-safe B-roll fallback keywords (Pexels won't flag these)
-const BROLL_FALLBACK = {
-  mystery: 'dark forest fog',
-  horror: 'old house night',
-  revenge: 'corporate office building',
-  confession: 'dimly lit room shadows',
-  default: 'dramatic atmosphere dark'
-};
 
 async function main() {
   const opts = parseArgs();
@@ -153,7 +172,6 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   
   const mediaTasks = segments.map(async (seg, i) => {
     const char = seg.isCharacterShot;
-    const keywords = extractKeywords(seg.text);
     
     if (char) {
       // Character shot: AI-generated image
@@ -165,47 +183,38 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
         return { success: false, index: i, error: e.message, type: 'image' };
       }
     } else {
-      // B-roll: Pexels video clip + Pexels image fallback
+      // B-roll: use visual terms from image_prompt (not generic narration keywords)
       const videoPath = path.join(folder, 'images', `media_${String(i).padStart(3, '0')}.mp4`);
       const imagePath = path.join(folder, 'images', `media_${String(i).padStart(3, '0')}.jpg`);
-      const safeKeyword = BROLL_FALLBACK[opts.genre] || BROLL_FALLBACK.default;
+      const visualTerms = extractVisualTerms(seg.image_prompt);
+      
+      // Try Pexels video with visual terms from image_prompt
       try {
-        const result = await searchVideos(keywords, 3);
+        const result = await searchVideos(visualTerms, 3);
         if (result.videos?.length) {
-          const video = result.videos[Math.floor(Math.random() * result.videos.length)];
+          const video = result.videos[Math.floor(Math.random() * Math.min(3, result.videos.length))];
           await downloadVideo(video.url, videoPath);
           return { success: true, index: i, type: 'video', duration: video.duration };
         }
-        // No videos found — try safe fallback keyword
-        const fallbackResult = await searchVideos(safeKeyword, 3);
-        if (fallbackResult.videos?.length) {
-          const video = fallbackResult.videos[Math.floor(Math.random() * fallbackResult.videos.length)];
-          await downloadVideo(video.url, videoPath);
-          return { success: true, index: i, type: 'video', duration: video.duration };
-        }
-      } catch (e) {
-        // Try safe fallback on error too
-        try {
-          const fallbackResult = await searchVideos(safeKeyword, 3);
-          if (fallbackResult.videos?.length) {
-            const video = fallbackResult.videos[Math.floor(Math.random() * fallbackResult.videos.length)];
-            await downloadVideo(video.url, videoPath);
-            return { success: true, index: i, type: 'video', duration: video.duration };
-          }
-        } catch (e2) { /* silence */ }
-      }
-      // Fallback: try Pexels image
+      } catch (e) { /* try fallback */ }
+      
+      // Fallback 1: Pexels image (still using visual terms from image_prompt)
       try {
-        const imgResult = await searchImages(safeKeyword, 3);
+        const imgResult = await searchImages(visualTerms, 5);
         if (imgResult.photos?.length) {
-          const photo = imgResult.photos[Math.floor(Math.random() * imgResult.photos.length)];
+          const photo = imgResult.photos[Math.floor(Math.random() * Math.min(3, imgResult.photos.length))];
           await downloadImage(photo.src.large, imagePath);
           return { success: true, index: i, type: 'image' };
         }
-      } catch (e2) {
-        return { success: false, index: i, error: 'No video or image found', type: 'image' };
+      } catch (e) { /* try AI fallback */ }
+      
+      // Fallback 2: AI generate image from the image_prompt (matches the actual scene!)
+      try {
+        await generateImage(seg.image_prompt, imagePath, 4);
+        return { success: true, index: i, type: 'image', isCharacter: false };
+      } catch (e) {
+        return { success: false, index: i, error: e.message, type: 'image' };
       }
-      return { success: false, index: i, error: 'Search failed', type: 'image' };
     }
   });
   

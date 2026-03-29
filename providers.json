@@ -47,8 +47,8 @@
         "kokoro": {
           "type": "local_neural",
           "voice": "af_sky",
-          "speed": 0.7,
-          "note": "82M params, runs on CPU, high quality"
+          "speed": 1.0,
+          "note": "82M params, runs on CPU, high quality. 1.0 = normal speed, higher = faster"
         },
         "cloudflare": {
           "endpoint": "/tts",
