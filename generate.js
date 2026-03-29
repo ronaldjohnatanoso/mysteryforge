@@ -128,73 +128,24 @@ async function main() {
   console.log(`   Length: ${opts.length}min (~${targetSegments} segments)`);
   console.log(`   Voice: ${opts.voice}`);
 
-  // System prompt — handles ANY story type, infers genre from prompt
-  const systemPrompt = `You are a viral YouTube storyteller. You write stories that HOOK viewers and keep them watching.
-You write ANY genre based on what the user requests: mystery, horror, thriller, romance, sci-fi, fantasy, comedy, drama, crime, revenge, confession, etc.
-Output ONLY valid JSON. No markdown. No explanation.
+  // System prompt — tight and direct: just output JSON
+  const systemPrompt = `You are a JSON generator. Output ONLY valid JSON. No markdown fences. No explanation. No preamble.
 
-Required schema:
-{
-  "title": "short_snake_case_title",
-  "genre": "inferred genre from prompt",
-  "characterAnchor": "visual description of main character for consistent rendering",
-  "segments": [{"id":1,"text":"20-30 word narration","imagePrompt":"scene description","isCharacterShot":false}]
-}
+Schema:
+{"title":"snake_case_title","genre":"genre","characterAnchor":"visual description","segments":[{"id":1,"text":"20-30 word paragraph narration","imagePrompt":"scene description","isCharacterShot":false}]}
 
-SEGMENT LENGTH EXAMPLE:
-WRONG: "I felt betrayed." (3 words - TOO SHORT)
-RIGHT: "I stared at the torn letter in the trash, my hands shaking with rage. Six months of overtime, and he gave MY promotion to his nephew." (23 words - CORRECT)
+RULES:
+- Each segment text: 20-30 words. Full paragraph. No one-liners.
+- isCharacterShot: true ~20% of segments (main character appears)
+- Hook first segment with tension/conflict
+- Use specific details: names, dates, amounts
+- Dark, mature tone. Adults only.
+- Total: ~${wordCount} words in ~${targetSegments} segments`;
 
-Each segment MUST have 20-30 words. This is critical.
+  // User prompt — the story request
+  const userPrompt = `Write a YouTube story for: ${opts.prompt}
 
-STORYTELLING RULES:
-
-1. HOOK (first segment):
-   - Start with tension/conflict immediately
-   - Make viewers NEED to know what happens
-   - Drop them into the action, not setup
-
-2. BUILD TENSION:
-   - Each segment should raise stakes
-   - Use specific details (names, dates, amounts, locations)
-   - Create "oh no" moments
-   - Plant details early that pay off later
-
-3. TWIST (around 60-70% through):
-   - Something unexpected must happen
-   - Viewer should think "I didn't see that coming"
-
-4. PACING:
-   - Short sentences for tension
-   - End segments on mini-cliffhangers when possible
-
-5. PAYOFF (final segments):
-   - Satisfying resolution
-   - Justice served (or ironic punishment)
-   - NO "to be continued" cop-outs
-
-6. CHARACTER SHOTS:
-   - isCharacterShot: true when the main character appears (~20% of segments)
-   - characterAnchor: detailed visual description for AI image generation
-
-7. QUALITY CONTROL:
-   - NO repetitive phrases
-   - NO lazy discoveries
-   - Every segment must ADVANCE THE PLOT
-   - Each segment 20-30 words, full paragraph narration
-   - Total: ~${wordCount} words across ~${targetSegments} segments
-
-TONE: Dark, mature, raw. Real emotions, real consequences, real human darkness. Write for adults.`;
-
-  // User prompt — the free-form story request
-  const userPrompt = `Write a story based on this request: "${opts.prompt}"
-
-DETECT THE GENRE from the prompt (mystery, horror, thriller, revenge, confession, crime, etc.) and write accordingly.
-
-~${wordCount} words total in ~${targetSegments} segments.
-Each segment 20-30 words. Full paragraphs, not one-liners.
-
-Output ONLY the JSON. No markdown fences.`;
+Output the JSON now. Only JSON. No commentary.`;
 
   // Generate story
   let result;

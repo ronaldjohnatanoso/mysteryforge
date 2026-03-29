@@ -76,23 +76,16 @@ async function createImageVideo(imagePath, duration, outputPath) {
     const totalFrames = Math.round(duration * fps);
     const zoomEnd = 1.15;
     
-    // Use simple zoompan with frame-based calculation
-    const filter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,zoompan=z='min(1+0.0015*on,${zoomEnd})':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${totalFrames}:s=1920x1080:fps=${fps}`;
+    // Skip zoompan - just scale and pad (zoompan breaks on some FFmpeg builds)
+    const filter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2`;
     
     const cmd = `${FFMPEG} -y -loop 1 -i "${imagePath}" -vf "${filter}" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
     
     exec(cmd, { timeout: 300000 }, (error, stdout, stderr) => {
       if (error) {
-        // Fallback to even simpler filter
-        const simpleCmd = `${FFMPEG} -y -loop 1 -i "${imagePath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
-        
-        exec(simpleCmd, { timeout: 300000 }, (err2) => {
-          if (err2) return reject(new Error(`FFmpeg failed: ${err2.message}`));
-          resolve(outputPath);
-        });
-      } else {
-        resolve(outputPath);
+        return reject(new Error(`FFmpeg failed: ${error.message}`));
       }
+      resolve(outputPath);
     });
   });
 }
@@ -102,16 +95,14 @@ async function createImageVideo(imagePath, duration, outputPath) {
  */
 async function concatVideos(videoPaths, outputPath) {
   return new Promise((resolve, reject) => {
-    // Create concat file
-    const concatFile = `/tmp/concat_${Date.now()}.txt`;
-    const content = videoPaths.map(p => `file '${path.resolve(p)}'`).join('\n');
-    fs.writeFileSync(concatFile, content);
+    // Scale all inputs to 1920x1080 then concat (handles mixed resolutions)
+    const inputs = videoPaths.map(p => `-i "${p}"`).join(' ');
+    const filterParts = videoPaths.map((_, i) => `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1[f${i}]`).join(';');
+    const concatMap = videoPaths.map((_, i) => `[f${i}]`).join('');
+    const cmd = `${FFMPEG} -y ${inputs} -filter_complex "${filterParts};${concatMap}concat=n=${videoPaths.length}:v=1:a=0[v]" -map "[v]" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
     
-    const cmd = `${FFMPEG} -y -f concat -safe 0 -i "${concatFile}" -c copy "${outputPath}"`;
-    
-    exec(cmd, { timeout: 300000 }, (error, stdout, stderr) => {
-      fs.unlinkSync(concatFile);
-      if (error) return reject(new Error(`Concat failed: ${error.message}`));
+    exec(cmd, { timeout: 600000 }, (error, stdout, stderr) => {
+      if (error) return reject(new Error(`Concat failed: ${error.message}\n${stderr.slice(-500)}`));
       resolve(outputPath);
     });
   });
