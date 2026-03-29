@@ -62,6 +62,7 @@ async function synthesizeVoice(script, voiceId) {
 - [ ] Analytics feedback loop
 
 ## Phase 5: Scaling
+- [x] Flexible story prompts (any story, any genre — just describe it)
 - [ ] Multi-channel support (different niches)
 - [ ] A/B thumbnail testing
 - [ ] Trending topic injection
@@ -81,7 +82,7 @@ async function synthesizeVoice(script, voiceId) {
 ## Architecture Vision
 
 ```
-User Input (genre, length)
+User Input (any story prompt, any genre)
         ↓
     Generator (LLM)
         ↓
