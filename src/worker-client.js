@@ -28,7 +28,7 @@ async function fetchWithRetry(url, options, retries = 3) {
 /**
  * Generate text (story generation)
  */
-async function generateText(prompt, systemPrompt = null, model = '@cf/openai/gpt-oss-120b', maxTokens = 4000) {
+async function generateText(prompt, systemPrompt = null, maxTokens = 8000, model = '@cf/openai/gpt-oss-120b') {
   const res = await fetchWithRetry(`${WORKER_URL}/text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

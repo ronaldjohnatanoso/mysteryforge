@@ -176,7 +176,7 @@ RULES:
 
 Output the JSON now. Only JSON. No commentary.`;
 
-    storyText = await generateText(genUser, genSystem, 4096);
+    storyText = await generateText(genUser, genSystem, 8000);
     
     // Parse JSON
     let jsonStr = storyText.trim();
@@ -219,7 +219,7 @@ Start with: "${topic.hook}"
 ~${wordCount} words. First person. Dramatic and specific.
 ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' : ''}`;
 
-    storyText = await generateText(genUser, systemPrompt, '@cf/openai/gpt-oss-120b');
+    storyText = await generateText(genUser, systemPrompt, 8000);
     
     // Clean and split
     cleaned = storyText.replace(/\[.*?\]/g, '').replace(/^"|"$/g, '').trim();
