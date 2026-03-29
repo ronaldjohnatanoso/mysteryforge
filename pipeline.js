@@ -29,12 +29,30 @@ const SECONDS_PER_SEGMENT = 8;
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  return {
-    genre: args.includes('--genre') ? args[args.indexOf('--genre') + 1] : 'revenge',
-    length: args.includes('--length') ? parseInt(args[args.indexOf('--length') + 1]) : 2,
-    topic: args.includes('--topic') ? args[args.indexOf('--topic') + 1] : null,
-    voice: args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'af_sky'  // Kokoro voices: af_sky, af_heart, am_michael, etc.
+  const opts = {
+    genre: 'revenge',
+    length: 2,
+    topic: null,
+    voice: 'af_sky',
+    prompt: null
   };
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--prompt' || arg === '-p') {
+      opts.prompt = args[++i];
+    } else if (arg === '--genre') {
+      opts.genre = args[++i];
+    } else if (arg === '--length' || arg === '-l') {
+      opts.length = parseInt(args[++i]) || 2;
+    } else if (arg === '--topic') {
+      opts.topic = args[++i];
+    } else if (arg === '--voice' || arg === '-v') {
+      opts.voice = args[++i] || 'af_sky';
+    }
+  }
+  
+  return opts;
 }
 
 function splitIntoSegments(story, targetWords = 25) {
@@ -110,41 +128,111 @@ async function main() {
   const opts = parseArgs();
   const startTime = Date.now();
   
+  const displayGenre = opts.prompt ? 'custom' : opts.genre;
   console.log(`\n🚀 MysteryForge Pipeline`);
-  console.log(`   Genre: ${opts.genre}, Length: ${opts.length}min\n`);
+  console.log(`   ${opts.prompt ? `Prompt: "${opts.prompt.substring(0, 60)}..."` : `Genre: ${opts.genre}`}`);
+  console.log(`   Length: ${opts.length}min, Voice: ${opts.voice}\n`);
   
-  // Load config
+  // Load config (only needed for genre/topic mode)
   const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
-  const genreConfig = config.genres[opts.genre];
-  const topic = opts.topic 
+  const genreConfig = opts.prompt ? null : config.genres[opts.genre];
+  // Only define topic if using genre/topic mode (not custom prompt)
+  const topic = genreConfig && (opts.topic 
     ? genreConfig.topics.find(t => t.type === opts.topic) || genreConfig.topics[0]
-    : genreConfig.topics[Math.floor(Math.random() * genreConfig.topics.length)];
+    : genreConfig.topics[Math.floor(Math.random() * genreConfig.topics.length)]);
   
   const wordCount = Math.floor(opts.length * 150 * 1.1);
   
   // ===== STEP 1: Generate Story =====
   console.log('📝 Generating story...');
-  const systemPrompt = `You write viral YouTube stories. First person narrative. Be specific with names, dates, places. End with: "Revenge is a dish best served cold." Just the story, no meta commentary.`;
-  const userPrompt = `Write a ${opts.length}-minute ${opts.genre} story about: ${topic.prompt}
+  
+  // Use custom prompt if provided, otherwise use genre/topic system
+  const storyPrompt = opts.prompt 
+    ? opts.prompt
+    : `${opts.length}-minute ${opts.genre} story about: ${topic.prompt}`;
+  
+  const systemPrompt = opts.prompt
+    ? `You write viral YouTube stories. First person. Specific names, dates, amounts. Dark, raw tone. No moralizing. End with: "Revenge is a dish best served cold." Output only the story.`
+    : `You write viral YouTube stories. First person narrative. Be specific with names, dates, places. End with: "Revenge is a dish best served cold." Just the story, no meta commentary.`;
+  
+  let storyText, cleaned, segmentTexts, segments, title, topicType;
+  
+  if (opts.prompt) {
+    // Prompt mode: use generate.js-style JSON output
+    const genSystem = `You are a JSON generator. Output ONLY valid JSON. No markdown fences. No explanation.
+
+Schema:
+{"title":"snake_case_title","genre":"genre","characterAnchor":"visual description","segments":[{"id":1,"text":"20-30 word paragraph narration","imagePrompt":"scene description","isCharacterShot":false}]}
+
+RULES:
+- Each segment text: 20-30 words. Full paragraph. No one-liners.
+- isCharacterShot: true ~20% of segments (main character appears)
+- Hook first segment with tension/conflict
+- Use specific details: names, dates, amounts
+- Dark, mature tone. End with: "Revenge is a dish best served cold."
+- Total: ~${wordCount} words in ~${Math.ceil(wordCount / 25)} segments`;
+
+    const genUser = `Write a YouTube story for: ${opts.prompt}
+
+Output the JSON now. Only JSON. No commentary.`;
+
+    storyText = await generateText(genUser, genSystem, 4096);
+    
+    // Parse JSON
+    let jsonStr = storyText.trim();
+    if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Failed to parse story JSON');
+    const storyData = JSON.parse(jsonMatch[0]);
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    title = `${storyData.title}_${timestamp}`;
+    topicType = 'custom';
+    
+    // Ensure characterAnchor
+    if (!storyData.characterAnchor) {
+      storyData.characterAnchor = 'person in dramatic lighting, cinematic style';
+    }
+    
+    // Ensure isCharacterShot
+    storyData.segments.forEach((seg, i) => {
+      if (seg.isCharacterShot === undefined) seg.isCharacterShot = false;
+      if (!seg.id) seg.id = i + 1;
+    });
+    
+    // Add image_prompt (clean up the field name)
+    storyData.segments = storyData.segments.map(seg => ({
+      id: seg.id,
+      text: seg.text,
+      image_prompt: seg.imagePrompt || seg.image_prompt || 'dramatic scene, cinematic lighting',
+      isCharacterShot: seg.isCharacterShot
+    }));
+    
+    cleaned = storyData.segments.map(s => s.text).join(' ');
+    segments = storyData.segments;
+  } else {
+    // Genre/topic mode: freeform text generation
+    const genUser = `Write a ${opts.length}-minute ${opts.genre} story about: ${topic.prompt}
 
 Start with: "${topic.hook}"
 
 ~${wordCount} words. First person. Dramatic and specific.
 ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' : ''}`;
 
-  const storyText = await generateText(userPrompt, systemPrompt, '@cf/openai/gpt-oss-120b');
-  
-  // Clean and split
-  const cleaned = storyText.replace(/\[.*?\]/g, '').replace(/^"|"$/g, '').trim();
-  const segmentTexts = splitIntoSegments(cleaned);
-  // Mark character shots: ~20% of segments (every 5th, skipping first)
-  const isCharacter = (i, total) => Math.floor((i / total) * 5) % 5 === 0 && i > 0;
-  const segments = segmentTexts.map((text, i) => ({
-    text,
-    image_prompt: generateImagePrompt(text, opts.genre),
-    isCharacterShot: isCharacter(i, segmentTexts.length)
-  }));
-  const title = cleaned.split(/[.!?]/)[0].split(' ').slice(0, 6).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '') || `story_${Date.now()}`;
+    storyText = await generateText(genUser, systemPrompt, '@cf/openai/gpt-oss-120b');
+    
+    // Clean and split
+    cleaned = storyText.replace(/\[.*?\]/g, '').replace(/^"|"$/g, '').trim();
+    segmentTexts = splitIntoSegments(cleaned);
+    const isCharacter = (i, total) => Math.floor((i / total) * 5) % 5 === 0 && i > 0;
+    segments = segmentTexts.map((text, i) => ({
+      text,
+      image_prompt: generateImagePrompt(text, opts.genre),
+      isCharacterShot: isCharacter(i, segmentTexts.length)
+    }));
+    title = cleaned.split(/[.!?]/)[0].split(' ').slice(0, 6).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '') || `story_${Date.now()}`;
+    topicType = topic.type;
+  }
   
   // Create output folder
   const folder = path.join(__dirname, 'output', title);
@@ -153,11 +241,20 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   
   // Save story
   const storyData = {
-    title, genre: opts.genre, topic: topic.type, length_minutes: opts.length,
-    total_words: cleaned.split(/\s+/).length, segment_count: segments.length,
-    seconds_per_segment: SECONDS_PER_SEGMENT, story: cleaned, segments,
-    ambient: genreConfig.ambient, colorGrade: genreConfig.colorGrade,
-    generated: new Date().toISOString(), provider: 'cloudflare-worker'
+    title, 
+    genre: opts.prompt ? (segments[0]?.isCharacterShot ? 'custom' : opts.genre) : opts.genre,
+    topic: topicType,
+    length_minutes: opts.length,
+    total_words: cleaned.split(/\s+/).length, 
+    segment_count: segments.length,
+    seconds_per_segment: SECONDS_PER_SEGMENT, 
+    story: cleaned, 
+    segments,
+    ambient: genreConfig?.ambient || 'dark cinematic',
+    colorGrade: genreConfig?.colorGrade || 'high contrast desaturated',
+    generated: new Date().toISOString(), 
+    provider: 'cloudflare-worker',
+    originalPrompt: opts.prompt || null
   };
   fs.writeFileSync(path.join(folder, 'story.json'), JSON.stringify(storyData, null, 2));
   fs.writeFileSync(path.join(folder, 'narration.txt'), cleaned);
