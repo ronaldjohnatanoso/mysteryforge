@@ -41,7 +41,7 @@ mysteryforge/
 
 ```bash
 # 1. Generate story (creates folder with title)
-node generate.js --genre mystery --length 3
+node generate.js --prompt "a mystery about a deleted website that only existed for 47 minutes" --length 3
 
 # 2. Synthesize audio (Kokoro TTS - high quality)
 node synthesize.js

@@ -74,11 +74,14 @@ test('provider module exports correct functions', () => {
 
 console.log('\n📝 Story Generator Tests\n');
 
-test('generate.js has correct argument parsing', () => {
+test('generate.js has correct argument parsing (v3 prompt-driven)', () => {
   const script = fs.readFileSync(path.join(__dirname, '../generate.js'), 'utf8');
   assert(script.includes('parseArgs'), 'parseArgs function missing');
-  assert(script.includes('--genre'), '--genre option missing');
+  // v3 is fully prompt-driven — no hardcoded genres
+  assert(script.includes('--prompt') || script.includes("'--prompt'"), '--prompt option missing');
   assert(script.includes('--length'), '--length option missing');
+  assert(script.includes('--interactive'), '--interactive option missing');
+  assert(script.includes('--list-voices'), '--list-voices option missing');
 });
 
 test('story output has required fields', () => {

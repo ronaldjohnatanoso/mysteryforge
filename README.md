@@ -28,8 +28,11 @@ export GROQ_API_KEY=your_key_here      # Story generation (free at console.groq.
 export PEXELS_API_KEY=your_key_here    # Stock images (free at pexels.com/api)
 export GEMINI_API_KEY=your_key_here    # AI images (free at aistudio.google.com/apikey)
 
-# Generate a 3-minute mystery story
-node generate.js --genre mystery --length 3
+# Generate a 3-minute story (any genre — just describe it)
+node generate.js --prompt "a mystery about a deleted website that only existed for 47 minutes" --length 3
+
+# Or use interactive mode — describe your story in plain English
+node generate.js --interactive
 
 # Synthesize voice (Kokoro TTS)
 node synthesize.js
