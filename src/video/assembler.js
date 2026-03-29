@@ -67,27 +67,33 @@ function generateKenBurnsFilter(duration, zoomStart = 1.0, zoomEnd = 1.2, panX =
 }
 
 /**
- * Create a video from a single image with duration
+ * Process a media file (image or video) to 1920x1080 MP4 with given duration
  */
-async function createImageVideo(imagePath, duration, outputPath) {
+async function processMedia(mediaPath, duration, outputPath) {
+  const isVideo = mediaPath.toLowerCase().endsWith('.mp4');
+  
   return new Promise((resolve, reject) => {
-    // Simple zoom effect - avoid complex expressions that break on some FFmpeg builds
-    const fps = 30;
-    const totalFrames = Math.round(duration * fps);
-    const zoomEnd = 1.15;
-    
-    // Skip zoompan - just scale and pad (zoompan breaks on some FFmpeg builds)
-    const filter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2`;
-    
-    const cmd = `${FFMPEG} -y -loop 1 -i "${imagePath}" -vf "${filter}" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
+    let cmd;
+    if (isVideo) {
+      // Video: scale and trim/pad to exact duration
+      cmd = `${FFMPEG} -y -i "${mediaPath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -t ${duration} "${outputPath}"`;
+    } else {
+      // Image: loop the still frame for the duration
+      cmd = `${FFMPEG} -y -loop 1 -i "${mediaPath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
+    }
     
     exec(cmd, { timeout: 300000 }, (error, stdout, stderr) => {
-      if (error) {
-        return reject(new Error(`FFmpeg failed: ${error.message}`));
-      }
+      if (error) return reject(new Error(`FFmpeg failed: ${error.message}`));
       resolve(outputPath);
     });
   });
+}
+
+/**
+ * Create a video from a single image with duration (backwards compat)
+ */
+async function createImageVideo(imagePath, duration, outputPath) {
+  return processMedia(imagePath, duration, outputPath);
 }
 
 /**

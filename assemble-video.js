@@ -19,22 +19,6 @@ const { execSync } = require('child_process');
 const FFMPEG = process.env.FFMPEG_PATH || path.join(process.env.HOME, '.local/bin/ffmpeg');
 const FFPROBE = process.env.FFPROBE_PATH || path.join(process.env.HOME, '.local/bin/ffprobe');
 
-// Ken Burns effect variations for character shots
-const CHARACTER_EFFECTS = [
-  // Slow zoom in
-  "zoompan=z='min(zoom+0.0015,1.5)':d={frames}:s=1920x1080:fps=30",
-  // Slow zoom out
-  "zoompan=z='if(lte(zoom,1.0),1.5,max(1.001,zoom-0.0015))':d={frames}:s=1920x1080:fps=30",
-  // Pan right
-  "zoompan=z=1.3:x='iw/2-(iw/zoom/2)+((iw/zoom/2)/{frames})*on':d={frames}:s=1920x1080:fps=30",
-  // Pan left
-  "zoompan=z=1.3:x='iw-(iw/zoom/2)-((iw/zoom/2)/{frames})*on':d={frames}:s=1920x1080:fps=30",
-  // Pan down
-  "zoompan=z=1.3:y='ih/2-(ih/zoom/2)+((ih/zoom/2)/{frames})*on':d={frames}:s=1920x1080:fps=30",
-  // Pan up
-  "zoompan=z=1.3:y='ih-(ih/zoom/2)-((ih/zoom/2)/{frames})*on':d={frames}:s=1920x1080:fps=30"
-];
-
 function getDuration(audioPath) {
   const result = execSync(`${FFPROBE} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`).toString();
   return parseFloat(result.trim());
@@ -98,13 +82,12 @@ function generateSRT(text, duration) {
 
 /**
  * Build video filter with support for mixed video/image inputs.
- * Ken Burns (zoompan) is applied ONLY to character shots, not B-roll.
+ * Character shots get simple scale (no Ken Burns — zoompan breaks on some FFmpeg builds).
  * Character shot indices come from story.json segments[].isCharacterShot.
  */
 function buildVideoFilter(mediaFiles, charShotIndices, duration) {
   const fileCount = mediaFiles.length;
   const durationPerSegment = duration / fileCount;
-  const framesPerSegment = Math.round(durationPerSegment * 30);
   const charSet = new Set(charShotIndices);
   
   const inputs = [];
@@ -120,11 +103,9 @@ function buildVideoFilter(mediaFiles, charShotIndices, duration) {
       inputs.push(`-t ${durationPerSegment.toFixed(2)} -i "${file}"`);
       filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v${i}];`;
     } else if (isChar) {
-      // Character shot image: apply Ken Burns (zoompan) effect
+      // Character shot image: simple scale, no Ken Burns (zoompan breaks on some FFmpeg builds)
       inputs.push(`-loop 1 -t ${durationPerSegment.toFixed(2)} -i "${file}"`);
-      const effect = CHARACTER_EFFECTS[i % CHARACTER_EFFECTS.length]
-        .replace('{frames}', framesPerSegment);
-      filterComplex += `[${i}:v]${effect}[v${i}];`;
+      filterComplex += `[${i}:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v${i}];`;
     } else {
       // B-roll image fallback: simple scale, no Ken Burns
       inputs.push(`-loop 1 -t ${durationPerSegment.toFixed(2)} -i "${file}"`);
