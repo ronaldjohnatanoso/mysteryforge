@@ -155,7 +155,7 @@ async function main() {
     ? `You write viral YouTube stories. First person. Specific names, dates, amounts. Dark, raw tone. No moralizing. End with: "Revenge is a dish best served cold." Output only the story.`
     : `You write viral YouTube stories. First person narrative. Be specific with names, dates, places. End with: "Revenge is a dish best served cold." Just the story, no meta commentary.`;
   
-  let storyText, cleaned, segmentTexts, segments, title, topicType;
+  let storyText, cleaned, segmentTexts, segments, title, topicType, characterAnchor;
   
   if (opts.prompt) {
     // Prompt mode: use generate.js-style JSON output
@@ -183,33 +183,31 @@ Output the JSON now. Only JSON. No commentary.`;
     if (jsonStr.startsWith('```')) jsonStr = jsonStr.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '');
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Failed to parse story JSON');
-    const storyData = JSON.parse(jsonMatch[0]);
+    const parsedStory = JSON.parse(jsonMatch[0]);
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    title = `${storyData.title}_${timestamp}`;
+    title = `${parsedStory.title}_${timestamp}`;
     topicType = 'custom';
     
-    // Ensure characterAnchor
-    if (!storyData.characterAnchor) {
-      storyData.characterAnchor = 'person in dramatic lighting, cinematic style';
-    }
+    // Extract characterAnchor before segments are remapped
+    characterAnchor = parsedStory.characterAnchor || 'person in dramatic lighting, cinematic style';
     
     // Ensure isCharacterShot
-    storyData.segments.forEach((seg, i) => {
+    parsedStory.segments.forEach((seg, i) => {
       if (seg.isCharacterShot === undefined) seg.isCharacterShot = false;
       if (!seg.id) seg.id = i + 1;
     });
     
     // Add image_prompt (clean up the field name)
-    storyData.segments = storyData.segments.map(seg => ({
+    parsedStory.segments = parsedStory.segments.map(seg => ({
       id: seg.id,
       text: seg.text,
       image_prompt: seg.imagePrompt || seg.image_prompt || 'dramatic scene, cinematic lighting',
       isCharacterShot: seg.isCharacterShot
     }));
     
-    cleaned = storyData.segments.map(s => s.text).join(' ');
-    segments = storyData.segments;
+    cleaned = parsedStory.segments.map(s => s.text).join(' ');
+    segments = parsedStory.segments;
   } else {
     // Genre/topic mode: freeform text generation
     const genUser = `Write a ${opts.length}-minute ${opts.genre} story about: ${topic.prompt}
@@ -232,6 +230,7 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     }));
     title = cleaned.split(/[.!?]/)[0].split(' ').slice(0, 6).join('_').toLowerCase().replace(/[^a-z0-9_]/g, '') || `story_${Date.now()}`;
     topicType = topic.type;
+    characterAnchor = `dark ${opts.genre} figure, cinematic lighting`;
   }
   
   // Create output folder
@@ -250,6 +249,7 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     seconds_per_segment: SECONDS_PER_SEGMENT, 
     story: cleaned, 
     segments,
+    characterAnchor: characterAnchor || `dark ${opts.genre || 'mystery'} figure, cinematic lighting`,
     ambient: genreConfig?.ambient || 'dark cinematic',
     colorGrade: genreConfig?.colorGrade || 'high contrast desaturated',
     generated: new Date().toISOString(), 

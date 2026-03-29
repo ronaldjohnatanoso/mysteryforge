@@ -136,6 +136,18 @@ mysteryforge/
 
 ## Changelog
 
+### v1.6.0 (2026-03-29)
+- Added story quality validator (validate-story.js) with 5 scoring dimensions:
+  - Hook strength (opening tension/conflict detection)
+  - Pacing (segment length variance)
+  - Structure (setup/payoff balance, character shot distribution)
+  - Cliché detection (10 common tropes)
+  - Completeness (required fields, word count)
+- Fixed test-suite.js timestamp format check (was too broad, now correctly matches `YYYY-MM-DD_HH-MM`)
+- Fixed pipeline.js bug: characterAnchor now saved to story.json in both prompt and genre/topic modes
+- Added npm scripts: `npm run validate`, `npm run validate:json`
+- Added 3 new validator tests, all 32 tests passing
+
 ### v1.5.0 (2026-03-28)
 - Added full YouTube API integration with googleapis (resumable uploads)
 - Installed googleapis and google-auth-library packages

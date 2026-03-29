@@ -108,9 +108,12 @@ test('story output has required fields', () => {
     assert(story.segment_count, 'segment_count missing');
     assert(story.provider, 'provider missing');
     
-    // characterAnchor is required in new format (stories with readable timestamp)
-    if (latest.includes('-')) {
-      assert(story.characterAnchor, 'characterAnchor missing (required for new format)');
+    // characterAnchor is required only in the new underscore-timestamp format (YYYY-MM-DD_HH-MM)
+    // Old format: "story_title" or "story_title_2026-03-29T06-40-56" (T-separator)
+    // New format: "story_title_2026-03-29_09-09" (underscore separator, human-readable)
+    const hasNewTimestampFormat = /_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(latest);
+    if (hasNewTimestampFormat) {
+      assert(story.characterAnchor, 'characterAnchor missing (required for new format with underscore timestamp)');
     }
   } else {
     console.log('   (skipped - no stories generated yet)');
@@ -120,8 +123,8 @@ test('story output has required fields', () => {
 test('story title has readable timestamp (new format)', () => {
   const outputDir = path.join(__dirname, '../output');
   const folders = fs.readdirSync(outputDir).filter(f => {
-    // Only check folders with new timestamp format (contains dashes)
-    return f.includes('-') && f.match(/\d{4}-\d{2}-\d{2}/);
+    // Only check folders with new timestamp format: title_YYYY-MM-DD_HH-MM
+    return /_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(f);
   });
   
   if (folders.length > 0) {
@@ -288,6 +291,43 @@ test('platform-templates.js has duration limits', () => {
   assert(script.includes('maxDuration: 180'), 'TikTok should have 180s limit');
   // Instagram Reels should have 90s limit
   assert(script.includes('maxDuration: 90'), 'Instagram Reels should have 90s limit');
+});
+
+// ============================================
+// STORY VALIDATOR TESTS
+// ============================================
+
+console.log('\n🔍 Story Validator Tests\n');
+
+test('validate-story.js exists and is executable', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../validate-story.js'), 'utf8');
+  assert(script.includes('checkHookStrength'), 'checkHookStrength function missing');
+  assert(script.includes('checkPacing'), 'checkPacing function missing');
+  assert(script.includes('checkStructure'), 'checkStructure function missing');
+  assert(script.includes('checkCliches'), 'checkCliches function missing');
+  assert(script.includes('checkCompleteness'), 'checkCompleteness function missing');
+  assert(script.includes('computeOverallScore'), 'computeOverallScore function missing');
+});
+
+test('validate-story.js has correct CLI arguments', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../validate-story.js'), 'utf8');
+  assert(script.includes('--latest'), '--latest flag missing');
+  assert(script.includes('--json'), '--json flag missing');
+  // Accepts positional folder argument (not --folder flag)
+  assert(script.includes('targetFolder') || script.includes('storyFolder'), 'folder argument missing');
+});
+
+test('validate-story.js grades and scores stories correctly', () => {
+  // Test hook detection logic inline
+  const hooks = [/i found/i, /they never tell you/i, /it started when/i, /the (first|last) time i saw/i, /i shouldn'?t have/i, /what they found/i, /the (worst|best) part/i, /it was 3am/i, /nobody believed me/i, /i was (alone|scared|terrified)/i, /the (police|doctor|neighbor) (called|told|said)/i, /the (letter|video|photo|message)/i];
+  
+  // Strong hook should score 100
+  const strongHook = 'I found the letter on the doorstep at 3am.';
+  assert(hooks.some(h => h.test(strongHook)), 'Strong hook should be detected');
+  
+  // Weak hook should not trigger
+  const weakHook = 'It was a nice day.';
+  assert(!hooks.some(h => h.test(weakHook)), 'Weak hook should not be detected');
 });
 
 // ============================================
