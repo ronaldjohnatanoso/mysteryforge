@@ -33,4 +33,4 @@ npm-debug.log*
 # Misc
 .cache/
 dist/
-build/
+build/.trending_cache.json
