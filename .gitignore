@@ -1,36 +1,40 @@
 # Dependencies
 node_modules/
 
-# Environment files - NEVER commit these
+# Cache files
+.trending_cache.json
+.trending_cache*/
+
+# Output (generated content)
+output/*
+
+# But keep the directory
+output/.gitkeep
+
+# Environment (secrets)
 .env
-.env.local
-.env.*.local
-*.env
-
-# Credentials and secrets
-credentials/
-.secrets/
-*.pem
-*.key
-
-# Generated output (optional - uncomment if you don't want to track)
-output/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
+credentials/.env
 
 # Logs
 *.log
 npm-debug.log*
 
-# Misc
-.cache/
-dist/
-build/.trending_cache.json
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Build artifacts
+*.mp4
+*.mp3
+*.wav
+*.ogg
+*.srt
+
+# Test coverage
+coverage/

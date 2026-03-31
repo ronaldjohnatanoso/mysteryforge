@@ -43,7 +43,9 @@
     "test": "node tests/test-suite.js",
     "test:providers": "node tests/providers.test.js",
     "test:generate": "node tests/generate.test.js",
-    "test:broll": "node tests/broll.test.js"
+    "test:broll": "node tests/broll.test.js",
+    "test:assembler": "node tests/assembler.test.js",
+    "test:subtitles": "node tests/subtitles.test.js"
   },
   "keywords": [
     "mystery",

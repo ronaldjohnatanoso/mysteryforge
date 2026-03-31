@@ -67,18 +67,23 @@ function generateKenBurnsFilter(duration, zoomStart = 1.0, zoomEnd = 1.2, panX =
 }
 
 /**
- * Process a media file (image or video) to 1920x1080 MP4 with given duration
+ * Process a media file (image or video) to 1920x1080 MP4 with given duration.
+ * Images get Ken Burns effect for dynamic visuals; videos are trimmed/scaled only.
  */
-async function processMedia(mediaPath, duration, outputPath) {
+async function processMedia(mediaPath, duration, outputPath, useKenBurns = false) {
   const isVideo = mediaPath.toLowerCase().endsWith('.mp4');
   
   return new Promise((resolve, reject) => {
     let cmd;
     if (isVideo) {
-      // Video: scale and trim/pad to exact duration
+      // Video: scale and trim/pad to exact duration (already moving, no Ken Burns needed)
       cmd = `${FFMPEG} -y -i "${mediaPath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -t ${duration} "${outputPath}"`;
+    } else if (useKenBurns) {
+      // Image with Ken Burns: smooth zoom/pan for character shots
+      const kbFilter = generateKenBurnsFilter(duration);
+      cmd = `${FFMPEG} -y -loop 1 -i "${mediaPath}" -filter_complex "${kbFilter}" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
     } else {
-      // Image: loop the still frame for the duration
+      // Image: loop the still frame for the duration (basic scaling)
       cmd = `${FFMPEG} -y -loop 1 -i "${mediaPath}" -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2" -t ${duration} -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p "${outputPath}"`;
     }
     
@@ -90,10 +95,11 @@ async function processMedia(mediaPath, duration, outputPath) {
 }
 
 /**
- * Create a video from a single image with duration (backwards compat)
+ * Create a video from a single image with duration (backwards compat).
+ * Applies Ken Burns effect for character shots, basic scale for B-roll.
  */
-async function createImageVideo(imagePath, duration, outputPath) {
-  return processMedia(imagePath, duration, outputPath);
+async function createImageVideo(imagePath, duration, outputPath, useKenBurns = false) {
+  return processMedia(imagePath, duration, outputPath, useKenBurns);
 }
 
 /**
@@ -129,10 +135,16 @@ async function addAudioToVideo(videoPath, audioPath, outputPath) {
 }
 
 /**
- * Main function: Assemble video from audio and images
+ * Main function: Assemble video from audio and images.
+ * 
+ * @param {Object} options
+ * @param {string} options.audio - Path to audio file
+ * @param {string[]} options.images - Paths to image/video files
+ * @param {string} options.output - Output MP4 path
+ * @param {number[]} options.charShotIndices - Indices of character shot images (for Ken Burns)
  */
 async function assembleVideo(options) {
-  const { audio, images, output } = options;
+  const { audio, images, output, charShotIndices = [] } = options;
   
   if (!fs.existsSync(audio)) {
     throw new Error(`Audio file not found: ${audio}`);
@@ -148,9 +160,12 @@ async function assembleVideo(options) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
   
+  const charSet = new Set(charShotIndices);
+  
   console.log('🎬 Assembling video...\n');
   console.log(`  Audio: ${audio}`);
   console.log(`  Images: ${images.length}`);
+  console.log(`  Character shots (Ken Burns): ${charSet.size}`);
   console.log(`  Output: ${output}\n`);
   
   // Get audio duration
@@ -174,10 +189,11 @@ async function assembleVideo(options) {
       continue;
     }
     
-    console.log(`  [${i + 1}/${images.length}] Processing image...`);
+    const useKenBurns = charSet.has(i);
+    console.log(`  [${i + 1}/${images.length}] Processing image...${useKenBurns ? ' (Ken Burns)' : ''}`);
     const segmentPath = path.join(tempDir, `segment_${i}.mp4`);
     
-    await createImageVideo(imagePath, durationPerImage, segmentPath);
+    await createImageVideo(imagePath, durationPerImage, segmentPath, useKenBurns);
     videoSegments.push(segmentPath);
   }
   
@@ -237,5 +253,8 @@ async function quickAssemble(audio, image, output) {
 module.exports = {
   assembleVideo,
   quickAssemble,
-  getAudioDuration
+  getAudioDuration,
+  generateKenBurnsFilter,
+  processMedia,
+  createImageVideo
 };

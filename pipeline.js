@@ -21,9 +21,11 @@ try {
   });
 } catch (e) { /* credentials env not found */ }
 
-const { generateText, generateImage, wordsToSRT } = require('./src/worker-client');
+const { generateText, generateImage } = require('./src/worker-client');
 const { generateSpeech } = require('./src/providers/index.js'); // Kokoro local TTS (default)
 const { searchVideos, downloadVideo, searchImages, downloadImage } = require('./src/images/fetcher.js');
+const { generateSRT } = require('./src/video/subtitles');
+const { getAudioDuration } = require('./src/video/assembler');
 
 const SECONDS_PER_SEGMENT = 8;
 
@@ -337,6 +339,16 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
   
   if (ttsResult.success) {
     console.log(`   ✅ Audio: ${(ttsResult.size / 1024).toFixed(0)}KB`);
+    
+    // Generate SRT subtitles from narration text (need audio duration)
+    const audioPath = path.join(folder, 'narration.mp3');
+    const audioDuration = await getAudioDuration(audioPath);
+    const subsPath = path.join(folder, 'subtitles.srt');
+    const subsSRT = generateSRT(cleaned, audioDuration);
+    if (subsSRT) {
+      fs.writeFileSync(subsPath, subsSRT);
+      console.log(`   ✅ Subtitles: ${subsSRT.split('\n').filter(l => l.trim()).length} lines`);
+    }
   } else {
     console.log(`   ❌ Audio: ${ttsResult.error}`);
   }

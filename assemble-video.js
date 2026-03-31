@@ -18,6 +18,7 @@ const { execSync } = require('child_process');
 
 const FFMPEG = process.env.FFMPEG_PATH || path.join(process.env.HOME, '.local/bin/ffmpeg');
 const FFPROBE = process.env.FFPROBE_PATH || path.join(process.env.HOME, '.local/bin/ffprobe');
+const { generateSRT } = require('./src/video/subtitles');
 
 function getDuration(audioPath) {
   const result = execSync(`${FFPROBE} -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`).toString();
@@ -36,48 +37,6 @@ function getLatestStoryFolder() {
     .sort((a, b) => b.mtime - a.mtime);
   
   return folders.length > 0 ? path.join(outputDir, folders[0].name) : null;
-}
-
-/**
- * Generate SRT subtitles
- */
-function generateSRT(text, duration) {
-  const sentences = text.replace(/\.\.\./g, '.').split(/(?<=[.!?])\s+/).filter(s => s.trim());
-  const totalWords = sentences.reduce((sum, s) => sum + s.split(/\s+/).length, 0);
-  const wordsPerSecond = totalWords / duration;
-
-  function formatTime(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 1000);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
-  }
-
-  let time = 0, index = 1;
-  const srtLines = [];
-
-  sentences.forEach(sentence => {
-    const wordCount = sentence.split(/\s+/).length;
-    const sentenceDuration = wordCount / wordsPerSecond;
-    const words = sentence.split(/\s+/);
-    
-    // Split into chunks of 8 words
-    for (let j = 0; j < words.length; j += 8) {
-      const chunk = words.slice(j, j + 8).join(' ');
-      const chunkDuration = (chunk.split(/\s+/).length / wordCount) * sentenceDuration;
-      
-      srtLines.push(`${index}`);
-      srtLines.push(`${formatTime(time)} --> ${formatTime(time + chunkDuration)}`);
-      srtLines.push(chunk);
-      srtLines.push('');
-      
-      index++;
-      time += chunkDuration;
-    }
-  });
-
-  return srtLines.join('\n');
 }
 
 /**
