@@ -12,6 +12,10 @@
  *   node assemble-video.js --latest
  */
 
+// Graceful SIGTERM/SIGINT so OpenClaw timeout doesn't leave partial output
+process.on('SIGTERM', () => { console.error('⚠️ SIGTERM received, aborting cleanly'); process.exit(124); });
+process.on('SIGINT', () => { console.error('⚠️ Interrupted'); process.exit(130); });
+
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -141,7 +145,7 @@ async function main() {
   console.log(`   Duration: ${duration.toFixed(1)}s`);
   console.log(`   Media files: ${mediaFiles.length}`);
   console.log(`   Videos (B-roll): ${videoCount}, Images: ${imageCount}`);
-  console.log(`   Character shots (Ken Burns): ${charShots}`);
+  console.log(`   Character shots (Ken Burns disabled — using scale only): ${charShots}`);
 
   const outputPath = path.join(storyFolder, 'video.mp4');
   const tempOutput = path.join(storyFolder, 'video_temp.mp4');
@@ -156,23 +160,37 @@ async function main() {
 
   console.log('\n   Building video...');
 
-  // Build filter: Ken Burns only on character shots, standard scaling on B-roll
+  // Build filter: all segments use simple scale+pad (Ken Burns disabled — zoompan breaks on some FFmpeg builds)
   const { inputs, filterComplex } = buildVideoFilter(mediaFiles, charShotIndices, duration);
 
-  // Run ffmpeg
+  // Audio is appended as input N (after N media files, indexed 0..N-1)
+  // Use a:0 to explicitly select first audio stream from the audio file
+  const audioInputIdx = mediaFiles.length;
   const cmd = `${FFMPEG} -y ${inputs} -i "${audioPath}" \
     -filter_complex "${filterComplex}" \
-    -map "[outv]" -map ${mediaFiles.length}:a \
+    -map "[outv]" -map ${audioInputIdx}:a:0 \
     -c:v libx264 -preset fast -crf 23 \
     -c:a aac -b:a 192k \
     -movflags +faststart \
     "${tempOutput}" 2>&1`;
 
+  console.log(`   [debug] ffmpeg concat+audio merge for ${mediaFiles.length} segments, audio=input[${audioInputIdx}]`);
+
+  let exitCode = 0;
   try {
-    execSync(cmd, { timeout: 600000, stdio: 'pipe' });
+    execSync(cmd, { timeout: 0, stdio: 'pipe' }); // timeout=0 means no OpenClaw timeout
   } catch (e) {
-    console.error('❌ Video encoding failed');
-    console.error(e.stdout?.toString()?.slice(-500) || e.message);
+    exitCode = e.status ?? 1;
+    const output = e.stdout?.toString() || '';
+    // On SIGTERM (143) treat as clean abort, don't treat as failure
+    if (e.signal === 'SIGTERM') {
+      console.error('⚠️ ffmpeg killed by SIGTERM');
+      fs.unlinkSync(tempOutput);
+      process.exit(124);
+    }
+    console.error(`❌ ffmpeg exited with code ${exitCode}`);
+    console.error(output.slice(-1000));
+    fs.unlinkSync(tempOutput);
     process.exit(1);
   }
 
@@ -185,13 +203,20 @@ async function main() {
       -vf "subtitles='${escapedPath}':force_style='FontSize=24,FontColor=white,OutlineColour=black,Outline=2,MarginV=40'" \
       -c:v libx264 -preset fast -crf 23 -c:a copy "${outputPath}" 2>&1`;
 
+    let subOk = false;
     try {
-      execSync(subCmd, { timeout: 300000, stdio: 'pipe' });
+      execSync(subCmd, { timeout: 0, stdio: 'pipe' });
       fs.unlinkSync(tempOutput);
+      subOk = true;
     } catch (e) {
+      if (e.signal === 'SIGTERM') {
+        console.error('⚠️ Subtitle burn killed by SIGTERM');
+        process.exit(124);
+      }
       console.log('   ⚠️ Subtitles failed, using video without');
       fs.renameSync(tempOutput, outputPath);
     }
+    if (subOk) console.log('   ✅ Subtitles burned');
   } else {
     fs.renameSync(tempOutput, outputPath);
   }
