@@ -23,6 +23,7 @@ function parseArgs() {
     prompt: null,
     length: 2,
     voice: 'af_sky',
+    lang: 'en',
     interactive: false,
     listVoices: false
   };
@@ -35,6 +36,8 @@ function parseArgs() {
       opts.length = parseInt(args[++i]) || 2;
     } else if (arg === '--voice' || arg === '-v') {
       opts.voice = args[++i] || 'af_sky';
+    } else if (arg === '--lang') {
+      opts.lang = args[++i] || 'en';
     } else if (arg === '--interactive' || arg === '-i') {
       opts.interactive = true;
     } else if (arg === '--list-voices') {
@@ -224,6 +227,7 @@ Output the JSON now. Only JSON. No commentary.`;
   storyData.generated = new Date().toISOString();
   storyData.provider = providerUsed;
   storyData.voice = opts.voice;
+  storyData.lang = opts.lang;
 
   // Save files
   fs.writeFileSync(path.join(folder, 'story.json'), JSON.stringify(storyData, null, 2));

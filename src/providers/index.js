@@ -95,17 +95,89 @@ async function generateImage(prompt, outputPath, options = {}) {
   throw new Error('All image providers failed');
 }
 
+// Language code mapping for Kokoro TTS
+const LANG_MAP = {
+  'en': 'a',   // American English (default)
+  'es': 'e',   // Spanish
+  'fr': 'f',   // French
+  'de': 'g',   // German
+  'it': 'i',   // Italian
+  'pt': 'p',   // Portuguese
+  'ja': 'j',   // Japanese
+  'zh': 'z',   // Mandarin Chinese
+  'hi': 'h',   // Hindi
+  'british': 'b' // British English
+};
+
+// Voice preferences per language (prefer available local voices)
+const VOICE_PREFERENCE = {
+  'a': ['af_sky', 'af_heart', 'am_michael', 'am_adam'],
+  'b': ['bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis'],
+  'e': ['pf_sarah', 'pf_nicole', 'pm_michael', 'pm_david'],
+  'f': ['ff_sarah', 'ff_nicole', 'fm_david', 'fm_michael'],
+  'g': ['gf_sarah', 'gf_nicole', 'gm_david', 'gm_michael'],
+  'i': ['if_sarah', 'if_nicole', 'im_david', 'im_michael'],
+  'p': ['pf_sarah', 'pf_nicole', 'pm_michael', 'pm_david'],
+  'j': ['jf_sarah', 'jf_nicole', 'jm_david', 'jm_michael'],
+  'z': ['zf_sarah', 'zf_nicole', 'zm_david', 'zm_michael'],
+  'h': ['hf_sarah', 'hf_nicole', 'hm_david', 'hm_michael']
+};
+
+// All locally available voices (installed via kokoro CLI)
+const LOCAL_VOICES = ['af_sky', 'af_heart', 'af_nicole', 'af_sarah', 'af_bella',
+                      'am_adam', 'am_michael', 'am_peter', 'am_alex', 'am_david',
+                      'bf_emma', 'bf_isabella', 'bm_george', 'bm_lewis',
+                      'pf_sarah', 'pm_michael', 'pm_david', 'orion'];
+
 /**
- * Generate speech - Kokoro only (af_sky, 0.7)
+ * Get best available voice for a language code.
  */
-async function generateSpeech(text, outputPath, speaker = 'af_sky') {
-  const result = await ttsKokoro(text, outputPath, speaker, 0.7);
-  return { ...result, provider: 'kokoro' };
+function getBestVoice(langCode, preferredVoice = null) {
+  // If user specified a voice, use it if available
+  if (preferredVoice && LOCAL_VOICES.includes(preferredVoice)) {
+    return preferredVoice;
+  }
+  // Otherwise pick from preference list for language
+  const prefs = VOICE_PREFERENCE[langCode] || VOICE_PREFERENCE['a'];
+  for (const v of prefs) {
+    if (LOCAL_VOICES.includes(v)) return v;
+  }
+  return 'af_sky'; // Ultimate fallback
+}
+
+/**
+ * Detect language from text (simple heuristic).
+ */
+function detectLanguage(text) {
+  const lower = text.toLowerCase();
+  // Spanish indicators
+  if (/\\b(yo|él|ella|está|que|el|la|los|las|un|una|de|en|con|por|para|este|esta|son|hay|como)\\b/.test(lower) && /[áéíóúñü¿¡]/.test(text)) return 'es';
+  // French indicators
+  if (/\\b(je|tu|il|elle|nous|vous|ils|elles|est|sont|que|qui|de|du|la|le|les|un|une|des|avec|pour)\\b/.test(lower) && /[àâçéèêëîïôûùûüÿœæ]/i.test(text)) return 'fr';
+  // German indicators
+  if (/\\b(ich|du|er|sie|es|wir|ihr|der|die|das|und|ist|mit|für|auf|von|zu|aus|in|an|bei|nicht|werden)\\b/.test(lower) && /[äöüß]/i.test(text)) return 'de';
+  // Default to English
+  return 'en';
+}
+
+/**
+ * Generate speech with Kokoro TTS.
+ * @param {string} text - Text to synthesize
+ * @param {string} outputPath - Output MP3 path
+ * @param {string} speaker - Voice name (e.g. 'af_sky')
+ * @param {number} speed - Speech speed (default 0.7)
+ * @param {string} lang - Language hint or auto-detect (default 'en')
+ */
+async function generateSpeech(text, outputPath, speaker = 'af_sky', speed = 0.7, lang = 'en') {
+  const langCode = LANG_MAP[lang] || lang === 'british' ? 'b' : 'a';
+  const voice = getBestVoice(langCode, speaker);
+  const result = await ttsKokoro(text, outputPath, voice, speed, langCode);
+  return { ...result, provider: 'kokoro', langCode, voice };
 }
 
 // ===== Kokoro TTS (Local, High Quality) =====
 
-async function ttsKokoro(text, outputPath, voice = 'af_sky', speed = 0.7) {
+async function ttsKokoro(text, outputPath, voice = 'af_sky', speed = 0.7, langCode = 'a') {
   const fs = require('fs');
   const path = require('path');
   const { execSync } = require('child_process');
@@ -125,7 +197,7 @@ import soundfile as sf
 import numpy as np
 
 text = open('${tempText}').read()
-pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
+pipeline = KPipeline(lang_code='${langCode}', repo_id='hexgrad/Kokoro-82M')
 segments = list(pipeline(text, voice='${voice}', speed=${speed}))
 all_audio = np.concatenate([s[2] for s in segments])
 sf.write('${wavPath}', all_audio, 24000)

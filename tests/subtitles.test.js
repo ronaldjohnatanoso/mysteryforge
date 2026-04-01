@@ -66,10 +66,9 @@ const multi = generateSRT('First sentence. Second sentence. Third sentence.', 9)
 check(multi.includes('First sentence'), 'contains first sentence');
 check(multi.includes('Second sentence'), 'contains second sentence');
 check(multi.includes('Third sentence'), 'contains third sentence');
-// Should have 3 subtitle indices (1, 2, 3)
-check(multi.includes('\n1\n'), 'has index 1');
-check(multi.includes('\n2\n'), 'has index 2');
-check(multi.includes('\n3\n'), 'has index 3');
+// Should have 3 subtitle entries (count via index\ntimestamp pattern)
+const entryCount = (multi.match(/\d+\n\d{2}:\d{2}:\d{2}/g) || []).length;
+check(entryCount === 3, `3 sentences → ${entryCount} entries (expected 3)`);
 
 // ==========================================
 // generateSRT empty input
@@ -93,7 +92,7 @@ console.log('\ngenerateSRT chunking:');
 const longText = Array.from({ length: 20 }, (_, i) => `word${i}`).join(' ');
 const longSRT = generateSRT(longText, 20);
 // Should have multiple chunks (20 words / 8 per chunk = 3 chunks minimum)
-const chunkCount = (longSRT.match(/\n\d+\n/g) || []).length;
+const chunkCount = (longSRT.match(/\d+\n\d{2}:\d{2}:\d{2}/g) || []).length;
 check(chunkCount >= 3, `20 words → ${chunkCount} chunks (expected ≥3)`);
 
 // ==========================================
@@ -125,7 +124,7 @@ check(srtFromWords.includes('00:00:00,000 --> 00:00:02,000'), 'spans full durati
 // Smaller chunk size
 const smallerChunks = generateSRTFromWords(words, 3);
 // 6 words / 3 per chunk = 2 chunks
-const smallerChunkCount = (smallerChunks.match(/\n\d+\n/g) || []).length;
+const smallerChunkCount = (smallerChunks.match(/\d+\n\d{2}:\d{2}:\d{2}/g) || []).length;
 check(smallerChunkCount === 2, `6 words @ chunk=3 → ${smallerChunkCount} chunks (expected 2)`);
 
 // Empty input

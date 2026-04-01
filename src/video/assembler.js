@@ -256,5 +256,7 @@ module.exports = {
   getAudioDuration,
   generateKenBurnsFilter,
   processMedia,
-  createImageVideo
+  createImageVideo,
+  concatVideos,
+  addAudioToVideo
 };

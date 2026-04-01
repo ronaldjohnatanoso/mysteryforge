@@ -14,6 +14,7 @@ const path = require('path');
 const { generateSpeech, getQuotaStatus } = require('./src/providers/index.js');
 
 // Kokoro voices (local neural TTS)
+// Kokoro voices (local neural TTS)
 const VOICES = {
   af_sky: 'Female - soft, mysterious (recommended)',
   af_heart: 'Female - warm, emotional',
@@ -23,12 +24,19 @@ const VOICES = {
   am_michael: 'Male - neutral'
 };
 
+// Language → Kokoro lang_code mapping
+const LANG_CODES = {
+  'en': 'a', 'es': 'e', 'fr': 'f', 'de': 'g',
+  'it': 'i', 'pt': 'p', 'ja': 'j', 'zh': 'z', 'hi': 'h'
+};
+
 function parseArgs() {
   const args = process.argv.slice(2);
   return {
     latest: args.includes('--latest'),
     voice: args.includes('--voice') ? args[args.indexOf('--voice') + 1] : 'af_sky',
-    listVoices: args.includes('--list-voices')
+    listVoices: args.includes('--list-voices'),
+    lang: args.includes('--lang') ? args[args.indexOf('--lang') + 1] : 'en'
   };
 }
 
@@ -92,7 +100,7 @@ async function main() {
   console.log(`   Length: ${text.split(/\s+/).length} words\n`);
 
   try {
-    const result = await generateSpeech(text, outputPath, voice);
+    const result = await generateSpeech(text, outputPath, voice, 0.7, options.lang);
     console.log(`\n✅ Audio saved: ${outputPath}`);
     console.log(`   Size: ${(result.size / 1024).toFixed(1)} KB\n`);
   } catch (e) {

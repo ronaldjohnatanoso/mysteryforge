@@ -36,7 +36,9 @@ function parseArgs() {
     length: 2,
     topic: null,
     voice: 'af_sky',
-    prompt: null
+    prompt: null,
+    lang: 'en',
+    sponsor: null
   };
   
   for (let i = 0; i < args.length; i++) {
@@ -51,6 +53,10 @@ function parseArgs() {
       opts.topic = args[++i];
     } else if (arg === '--voice' || arg === '-v') {
       opts.voice = args[++i] || 'af_sky';
+    } else if (arg === '--lang') {
+      opts.lang = args[++i] || 'en';
+    } else if (arg === '--sponsor') {
+      opts.sponsor = args[++i] || 'default';
     }
   }
   
@@ -80,6 +86,45 @@ function splitIntoSegments(story, targetWords = 25) {
   }
   if (current.length) segments.push(current.join(' ').trim());
   return segments.filter(s => s.length > 10);
+}
+
+/**
+ * Build a natural sponsor segment for the outro.
+ * Languages: en, es, fr, de, it, pt, ja, zh
+ */
+function buildSponsorSegment(sponsorType = 'default', lang = 'en') {
+  const sponsors = {
+    en: {
+      vpn: "Before we go — if you care about your privacy online, I'd check out this VPN. It's fast, secure, and won't track what you do. The link's in the description.",
+      hosting: "If you've ever wanted to build your own website or start a podcast, this hosting company is where I started. Affordable, reliable, and they set you up in minutes. Link's below.",
+      audiobook: "Love stories like this? You'll love this audiobook service. Get a free trial — link's in the description below.",
+      default: "Support the channel — hit like, subscribe, and share this story with someone who'd love it. See you in the next one."
+    },
+    es: {
+      vpn: "Antes de irte — si te importa tu privacidad en línea, echa un vistazo a esta VPN. Es rápida, segura, y no rastrea lo que haces. El enlace está en la descripción.",
+      hosting: "Si alguna vez quisiste crear tu propia página web o comenzar un podcast, este hosting es donde yo empecé. Asequible y confiable.",
+      audiobook: "¿Te encantan las historias como esta? Te va a encantar este servicio de audiolibros. Prueba gratis — enlace en la descripción.",
+      default: "Apoya el canal — dale like, suscríbete, y comparte esta historia con alguien que la disfrutaría. Nos vemos en la próxima."
+    },
+    fr: {
+      vpn: "Avant de partir — si vous tenez à votre vie privée en ligne, découvrez ce VPN. Rapide, sécurisé, et il ne suit pas vos activités. Le lien est dans la description.",
+      hosting: "Si vous avez toujours voulu créer votre propre site web ou lancer un podcast, cet hébergeur est où j'ai commencé.",
+      audiobook: "Vous adorez les histoires comme celle-ci ? Vous allez adorer ce service d'audiolivres. Essai gratuit — lien en description.",
+      default: "Soutenez la chaîne — likez, abonnez-vous, et partagez cette histoire. À bientôt pour une prochaine histoire."
+    },
+    de: {
+      vpn: "Bevor du gehst — wenn dir deine Online-Privatsphäre wichtig ist, schau dir dieses VPN an. Schnell, sicher, und es verfolgt dich nicht. Der Link ist in der Beschreibung.",
+      hosting: "Wenn du schon immer deine eigene Website starten wolltest, ist das der Hosting-Anbieter, bei dem ich angefangen habe.",
+      audiobook: "Liebst du Geschichten wie diese? Du wirst diesen Hörbuchservice lieben. Kostenlose Testversion — Link unten.",
+      default: "Unterstütze den Kanal — like, abonniere, und teile diese Geschichte. Bis zur nächsten!"
+    }
+  };
+  
+  const langSponsors = sponsors[lang] || sponsors['en'];
+  const template = langSponsors[sponsorType] || langSponsors['default'];
+  
+  // Wrap in proper sentence structure
+  return `${template}`;
 }
 
 function generateImagePrompt(text, genre) {
@@ -256,7 +301,10 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     colorGrade: genreConfig?.colorGrade || 'high contrast desaturated',
     generated: new Date().toISOString(), 
     provider: 'cloudflare-worker',
-    originalPrompt: opts.prompt || null
+    originalPrompt: opts.prompt || null,
+    lang: opts.lang,
+    sponsor: opts.sponsor || null,
+    sponsorText: sponsorText || null
   };
   fs.writeFileSync(path.join(folder, 'story.json'), JSON.stringify(storyData, null, 2));
   fs.writeFileSync(path.join(folder, 'narration.txt'), cleaned);
@@ -317,7 +365,15 @@ ${opts.genre === 'revenge' ? 'End with: "Revenge is a dish best served cold."' :
     }
   });
   
-  const ttsTask = generateSpeech(cleaned, path.join(folder, 'narration.mp3'), opts.voice)
+  // Sponsor segment injection (appended to narration before TTS)
+  let sponsorText = null;
+  if (opts.sponsor) {
+    sponsorText = buildSponsorSegment(opts.sponsor, opts.lang);
+    cleaned = cleaned + ' ' + sponsorText;
+    console.log(`   📣 Sponsor segment: "${sponsorText.substring(0, 50)}..."`);
+  }
+  
+  const ttsTask = generateSpeech(cleaned, path.join(folder, 'narration.mp3'), opts.voice, 0.7, opts.lang)
     .then(r => ({ success: true, size: r.size }))
     .catch(e => ({ success: false, error: e.message }));
   
