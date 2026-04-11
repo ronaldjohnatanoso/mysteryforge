@@ -31,7 +31,7 @@ jobs:
       - name: Find .env files
         run: |
           # Check for any .env files that might be committed
-          env_files=$(find . -name "*.env" -o -name ".env*" -not -path "./.git/*" 2>/dev/null || true)
+          env_files=$(find . \( -name "*.env" -o -name ".env*" \) -not -path "./.git/*" -not -name ".env.example" 2>/dev/null || true)
           if [ -n "$env_files" ]; then
             echo "❌ Found .env files that should NOT be committed:"
             echo "$env_files"
