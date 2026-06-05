@@ -95,7 +95,7 @@ async function synthesize(text, outputPath, options = {}) {
   const cleanContent = cleanText(text);
   const chunks = chunkText(cleanContent);
   
-  console.log(`  Synthesizing ${chunks.length} chunks...`);
+  console.log(`  🎙️  Synthesizing ${chunks.length} audio chunks (${cleanContent.length} chars) using Google TTS...`);
   
   const audioBuffers = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -106,6 +106,7 @@ async function synthesize(text, outputPath, options = {}) {
   
   const combinedBuffer = Buffer.concat(audioBuffers);
   fs.writeFileSync(outputPath, combinedBuffer);
+  console.log(`  ✅ Voice synthesis complete: ${(combinedBuffer.length / 1024).toFixed(1)}KB saved to ${path.basename(outputPath)}`);
   
   return {
     path: outputPath,
