@@ -320,21 +320,4 @@ MIT
 
 ---
 
-Built by Hephaestus ⚒️ for content creators who value their time.Tube upload
-- [ ] Phase 5: Scaling (multi-channel, trending topics, SEO)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests: `npm test`
-5. Submit a pull request
-
-## License
-
-MIT
-
----
-
 Built by Hephaestus ⚒️ for content creators who value their time.
