@@ -30,7 +30,7 @@ function cleanPrompt(prompt, maxLength = 500) {
   
   // Truncate if too long
   if (cleaned.length > maxLength) {
-    cleaned = cleaned.substring(0, maxLength).replace(/\s+\S*$/, '');
+    cleaned = cleaned.slice(0, maxLength).replace(/\s+\S*$/, '');
   }
   
   return cleaned;
@@ -201,7 +201,7 @@ async function generateMultiple(prompts, outputDir, options = {}) {
     const prompt = prompts[i];
     const outputPath = path.join(outputDir, `ai_image_${i + 1}.jpg`);
     
-    console.log(`  [${i + 1}/${prompts.length}] Generating: ${prompt.substring(0, 40)}...`);
+    console.log(`  [${i + 1}/${prompts.length}] Generating: ${prompt.slice(0, 40)}...`);
     
     try {
       const result = await generateImage(prompt, outputPath, options);

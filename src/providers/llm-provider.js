@@ -146,7 +146,7 @@ class LLMProvider {
     );
 
     if (!response.choices || !response.choices[0]) {
-      throw new Error(`Unexpected response: ${JSON.stringify(response).substring(0, 500)}`);
+      throw new Error(`Unexpected response: ${JSON.stringify(response).slice(0, 500)}`);
     }
 
     return {

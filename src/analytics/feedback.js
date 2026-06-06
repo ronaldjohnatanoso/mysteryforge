@@ -322,7 +322,7 @@ async function listTracked() {
     const eng = String(v.engagementRate + '%').padStart(6);
     const genre = v.genre.padEnd(9);
     const len = String(v.length + 'm').padStart(5);
-    const folder = v.storyFolder.substring(0, 30);
+    const folder = v.storyFolder.slice(0, 30);
     console.log(`   ${views}  ${eng}  ${genre}  ${len}  ${folder}`);
   }
   

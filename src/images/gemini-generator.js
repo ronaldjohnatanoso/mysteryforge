@@ -154,7 +154,7 @@ async function generateMultiple(prompts, outputDir, options = {}) {
     const prompt = prompts[i];
     const outputPath = path.join(outputDir, `gemini_${String(i + 1).padStart(3, '0')}.png`);
     
-    console.log(`  [${i + 1}/${prompts.length}] ${prompt.substring(0, 40)}...`);
+    console.log(`  [${i + 1}/${prompts.length}] ${prompt.slice(0, 40)}...`);
     
     try {
       const result = await generateImage(prompt, outputPath, options);

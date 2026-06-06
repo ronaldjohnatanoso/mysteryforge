@@ -58,7 +58,7 @@ async function generateText(prompt, systemPrompt = null, maxTokens = 4096) {
         return { text: result, provider: 'cloudflare' };
       }
     } catch (e) {
-      console.log(`   ${provider} failed: ${e.message.substring(0, 50)}`);
+      console.log(`   ${provider} failed: ${e.message.slice(0, 50)}`);
       if (e.message.includes('quota') || e.message.includes('10,000 neurons')) {
         quotaUsage.cloudflare.neurons = 10000;
       }
@@ -88,7 +88,7 @@ async function generateImage(prompt, outputPath, options = {}) {
         return await imagePollinations(prompt, outputPath, options);
       }
     } catch (e) {
-      console.log(`   ${provider} failed: ${e.message.substring(0, 50)}`);
+      console.log(`   ${provider} failed: ${e.message.slice(0, 50)}`);
     }
   }
   
@@ -496,7 +496,7 @@ async function imagePexels(prompt, outputPath) {
 // ===== Pollinations Implementation =====
 
 async function imagePollinations(prompt, outputPath, options = {}) {
-  const encoded = encodeURIComponent(prompt.substring(0, 500));
+  const encoded = encodeURIComponent(prompt.slice(0, 500));
   const url = `https://image.pollinations.ai/prompt/${encoded}?width=${options.width || 1920}&height=${options.height || 1080}&nologo=true`;
   
   const res = await fetch(url);

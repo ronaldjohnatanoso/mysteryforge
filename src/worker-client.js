@@ -16,7 +16,7 @@ async function fetchWithRetry(url, options, retries = 3) {
       const res = await fetch(url, options);
       if (res.ok) return res;
       const errText = await res.text();
-      console.warn(`Attempt ${i + 1} failed: ${res.status} - ${errText.substring(0, 100)}`);
+      console.warn(`Attempt ${i + 1} failed: ${res.status} - ${errText.slice(0, 100)}`);
     } catch (err) {
       console.warn(`Attempt ${i + 1} error: ${err.message}`);
     }

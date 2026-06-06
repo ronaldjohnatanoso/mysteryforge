@@ -141,7 +141,7 @@ class SEOOptimizer {
    */
   generateTitle() {
     // First segment text often has the hook
-    const firstSegment = this.segments[0]?.text || this.text.substring(0, 200);
+    const firstSegment = this.segments[0]?.text || this.text.slice(0, 200);
     const entities = this.extractEntities();
     
     // Choose title template based on genre
@@ -161,7 +161,7 @@ class SEOOptimizer {
     
     // Ensure title is within YouTube's 100-char limit
     if (template.length > 95) {
-      template = template.substring(0, 92) + '...';
+      template = template.slice(0, 92) + '...';
     }
     
     return template;
@@ -204,7 +204,7 @@ class SEOOptimizer {
     
     // Opening hook from first segment
     const firstSegment = this.segments[0]?.text || '';
-    const hook = firstSegment.substring(0, 200).trim() + (firstSegment.length > 200 ? '...' : '');
+    const hook = firstSegment.slice(0, 200).trim() + (firstSegment.length > 200 ? '...' : '');
     
     // Choose random description hooks
     const hook1 = DESCRIPTION_HOOKS[Math.floor(Math.random() * DESCRIPTION_HOOKS.length)]
@@ -368,7 +368,7 @@ async function main() {
   console.log(`\n📝 Title (${seo.title.length}/100 chars):`);
   console.log(`   ${seo.title}`);
   console.log(`\n📄 Description (${seo.description.length} chars):`);
-  console.log(`   ${seo.description.substring(0, 200)}...`);
+  console.log(`   ${seo.description.slice(0, 200)}...`);
   console.log(`\n🏷️  Tags (${seo.tags.length} tags, ~${seo.tags.join(', ').length} chars):`);
   console.log(`   ${seo.tags.slice(0, 10).join(', ')}...`);
   console.log(`\n📁 Save path: output/${storyFolder}/seo.json`);
