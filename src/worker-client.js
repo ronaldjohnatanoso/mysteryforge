@@ -189,6 +189,14 @@ const VOICES = {
   helios: 'Smooth male'
 };
 
+/**
+ * Get the list of available TTS voices.
+ * Returns an array of { id, description } objects.
+ */
+function getVoices() {
+  return Object.entries(VOICES).map(([id, description]) => ({ id, description }));
+}
+
 module.exports = {
   WORKER_URL,
   generateText,
@@ -197,5 +205,6 @@ module.exports = {
   transcribeAudio,
   wordsToSRT,
   VOICES,
+  getVoices,
   fetchWithRetry
 };

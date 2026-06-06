@@ -7,6 +7,7 @@ const assert = require('assert');
 const path = require('path');
 
 const {
+  getVoices,
   WORKER_URL,
   wordsToSRT,
   VOICES,
@@ -40,6 +41,14 @@ async function run() {
   check('athena' in VOICES, 'VOICES includes athena (Clear female)');
   check('luna' in VOICES, 'VOICES includes luna (Soft female)');
   check(typeof VOICES.orion === 'string', 'Voice descriptions are strings');
+
+  // getVoices()
+  const voices = getVoices();
+  check(Array.isArray(voices), 'getVoices returns an array');
+  check(voices.length === Object.keys(VOICES).length, 'getVoices returns one entry per voice');
+  check(voices[0].id && voices[0].description, 'Each voice entry has id and description');
+  check(voices.some(v => v.id === 'orion'), 'getVoices includes orion');
+  check(voices.every(v => typeof v.id === 'string' && typeof v.description === 'string'), 'Voice entries are {id, description} strings');
 
   // wordsToSRT
   const words = [
