@@ -218,22 +218,30 @@ function getFallbackTopics(genre) {
 /**
  * Inject trending topics into a story prompt.
  * Returns enhanced prompt with trending hooks/keywords.
+ *
+ * @param {string} prompt - Original story prompt
+ * @param {string} genre - Story genre (mystery, horror, revenge, confession)
+ * @param {string[]} trendingTopics - Trending topics to inject
+ * @returns {string} Enhanced prompt
  */
 function injectTrendingIntoPrompt(prompt, genre, trendingTopics = []) {
   if (!trendingTopics || trendingTopics.length === 0) {
     return prompt;
   }
-  
-  // Pick 1-2 random trending topics to inject
+
+  // Pick 1-3 trending topics to inject
   const picks = trendingTopics.slice(0, 3);
   const injected = picks.map(t => `topic: "${t}"`).join(', ');
-  
+
+  // Genre-specific label for the trending section
+  const genreLabel = genre ? genre.charAt(0).toUpperCase() + genre.slice(1) : 'Trending';
+
   // Inject as a hint in the prompt
   const enhancedPrompt = `${prompt}
 
-Trending hooks to optionally incorporate (pick one if it fits):
+${genreLabel} hooks to optionally incorporate (pick one if it fits):
 ${injected}`;
-  
+
   return enhancedPrompt;
 }
 
