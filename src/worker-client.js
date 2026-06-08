@@ -6,6 +6,7 @@
  */
 
 const WORKER_URL = process.env.MYSTERYFORGE_WORKER_URL || 'https://mysteryforge-images.ronaldjohnatanoso.workers.dev';
+const { formatSRTTime } = require('./video/subtitles');
 
 /**
  * Retry wrapper for occasional cold starts
