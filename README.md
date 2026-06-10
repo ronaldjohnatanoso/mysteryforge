@@ -306,6 +306,24 @@ chmod +x .git/hooks/pre-commit
   - [x] Analytics feedback loop
 - [ ] Phase 5: Scaling (multi-channel, trending topics, community bot)
 
+## Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run individual test suites
+npm run test:schedule   # Schedule queue logic
+npm run test:seo        # SEO optimizer
+npm run test:trending   # Trending topics
+npm run test:analytics   # Analytics feedback
+npm run test:providers  # Provider fallbacks
+npm run test:assembler  # Video assembler
+npm run test:subtitles  # Subtitle generation
+```
+
+Run `node tests/<name>.test.js` for any test file in the `tests/` directory.
+
 ## Contributing
 
 1. Fork the repository
