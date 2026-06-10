@@ -192,19 +192,23 @@ function handleResponse(res, outputPath, resolve, reject) {
 }
 
 /**
- * Generate multiple images with proper rate limiting
+ * Generate multiple images with proper rate limiting.
+ * @param {string[]} prompts - Array of text prompts
+ * @param {string} outputDir - Output directory
+ * @param {Object} options - Generation options (width, height, seed, maxRetries)
  */
 async function generateMultiple(prompts, outputDir, options = {}) {
   const results = [];
-  
+  const seed = options.seed || Math.floor(Math.random() * 1000000);
+
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i];
-    const outputPath = path.join(outputDir, `ai_image_${i + 1}.jpg`);
-    
+    const outputPath = path.join(outputDir, `ai_image_${String(i + 1).padStart(2, '0')}.jpg`);
+
     console.log(`  [${i + 1}/${prompts.length}] Generating: ${prompt.slice(0, 40)}...`);
     
     try {
-      const result = await generateImage(prompt, outputPath, options);
+      const result = await generateImage(prompt, outputPath, { ...options, seed });
       results.push(result);
       console.log(`    ✓ Saved (${Math.round(result.size/1024)}KB)`);
     } catch (e) {
