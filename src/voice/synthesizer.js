@@ -65,24 +65,34 @@ function chunkText(text, maxLength = 180) {
   return chunks;
 }
 
-function downloadChunk(text, lang) {
+function downloadChunk(text, lang, retries = 3) {
   return new Promise((resolve, reject) => {
     const url = `${GOOGLE_TTS_URL}?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${lang}&client=tw-ob`;
     
-    https.get(url, (res) => {
-      if (res.statusCode === 301 || res.statusCode === 302) {
-        https.get(res.headers.location, (res2) => {
-          const chunks = [];
-          res2.on('data', chunk => chunks.push(chunk));
-          res2.on('end', () => resolve(Buffer.concat(chunks)));
-        }).on('error', reject);
-        return;
-      }
-      
-      const chunks = [];
-      res.on('data', chunk => chunks.push(chunk));
-      res.on('end', () => resolve(Buffer.concat(chunks)));
-    }).on('error', reject);
+    const attempt = (retriesLeft) => {
+      https.get(url, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          https.get(res.headers.location, (res2) => {
+            const chunks = [];
+            res2.on('data', chunk => chunks.push(chunk));
+            res2.on('end', () => resolve(Buffer.concat(chunks)));
+          }).on('error', e => retriesLeft > 0 ? setTimeout(() => attempt(retriesLeft - 1), 500) : reject(e));
+          return;
+        }
+        
+        if (!res.ok) {
+          return retriesLeft > 0
+            ? setTimeout(() => attempt(retriesLeft - 1), 500)
+            : reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks)));
+      }).on('error', e => retriesLeft > 0 ? setTimeout(() => attempt(retriesLeft - 1), 500) : reject(e));
+    };
+    
+    attempt(retries);
   });
 }
 
