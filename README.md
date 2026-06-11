@@ -196,6 +196,9 @@ GEMINI_API_KEY=xxx             # AI images (required for --gemini)
 
 # FFmpeg path (if not in PATH)
 FFMPEG_PATH=~/.local/bin/ffmpeg
+
+# Cloudflare Worker endpoint (AI text/image/speech via Worker)
+MYSTERYFORGE_WORKER_URL=https://mysteryforge-images.ronaldjohnatanoso.workers.dev
 ```
 
 ## Video Features
