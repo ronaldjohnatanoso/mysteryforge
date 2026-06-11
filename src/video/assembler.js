@@ -13,13 +13,25 @@
  *   });
  */
 
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// FFmpeg binary paths
-const FFMPEG = process.env.FFMPEG_PATH || path.join(process.env.HOME, '.local/bin/ffmpeg');
-const FFPROBE = process.env.FFPROBE_PATH || path.join(process.env.HOME, '.local/bin/ffprobe');
+/**
+ * Resolve FFmpeg binary path.
+ * Checks env var first, then `which ffmpeg`, then falls back to ~/.local/bin/ffmpeg.
+ */
+function resolveBinary(name, envKey, fallback) {
+  if (process.env[envKey]) return process.env[envKey];
+  try {
+    const result = execSync(`which ${name}`, { encoding: 'utf8', stdio: 'pipe' });
+    if (result.trim()) return result.trim();
+  } catch (_) { /* not in PATH */ }
+  return fallback;
+}
+
+const FFMPEG = resolveBinary('ffmpeg', 'FFMPEG_PATH', path.join(process.env.HOME, '.local/bin/ffmpeg'));
+const FFPROBE = resolveBinary('ffprobe', 'FFPROBE_PATH', path.join(process.env.HOME, '.local/bin/ffprobe'));
 
 /**
  * Get audio duration in seconds
