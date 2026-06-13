@@ -116,8 +116,8 @@ class SEOOptimizer {
     const placeWords = ['house', 'apartment', 'office', 'school', 'hospital', 'woods', 'forest', 'basement', 'attic', 'street', 'city', 'town', 'room', 'building'];
     const places = placeWords.filter(p => text.toLowerCase().includes(p));
     
-    // Extract professions
-    const professions = ['doctor', 'nurse', 'teacher', 'police', 'officer', 'lawyer', 'manager', 'boss', 'neighbor', 'stranger', 'friend', 'mother', 'father', 'sister', 'brother'];
+    // Extract professions (actual job titles, not family relationships)
+    const professions = ['doctor', 'nurse', 'teacher', 'police', 'officer', 'lawyer', 'manager', 'boss', 'neighbor', 'stranger', 'friend'];
     const profession = professions.find(p => text.toLowerCase().includes(p)) || 'stranger';
     
     // Extract objects
