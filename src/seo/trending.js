@@ -9,7 +9,7 @@
  *   const topics = await getTrendingTopics('mystery');
  * 
  *   const { injectTrendingIntoPrompt } = require('./src/seo/trending');
- *   const prompt = injectTrendingIntoPrompt('mystery revenge story', topics);
+ *   const prompt = injectTrendingIntoPrompt('mystery revenge story', 'mystery', topics);
  */
 
 const fs = require('fs');
