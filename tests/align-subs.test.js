@@ -2,7 +2,15 @@
  * Tests for align-subs.js — TikTok-style subtitle alignment
  */
 
-const { parseSRT, formatTime } = require('../align-subs.js');
+const { parseSRT, formatTime, generateTikTokSRT } = require('../align-subs.js');
+
+let passed = 0;
+let failed = 0;
+
+function assert(condition, msg) {
+  if (condition) { passed++; console.log(`  ✅ ${msg}`); }
+  else { failed++; console.log(`  ❌ ${msg}`); }
+}
 
 const SAMPLE_SRT = `1
 00:00:01,000 --> 00:00:02,500
@@ -16,48 +24,65 @@ World
 00:00:05,000 --> 00:00:06,000
 This is a test`;
 
-describe('align-subs.js', () => {
-  describe('parseSRT', () => {
-    it('parses valid SRT content into subtitle objects', () => {
-      const subs = parseSRT(SAMPLE_SRT);
-      expect(subs).toHaveLength(3);
-      expect(subs[0].text).toBe('Hello');
-      expect(subs[0].start).toBeCloseTo(1.0, 1);
-      expect(subs[0].end).toBeCloseTo(2.5, 1);
-    });
+function run() {
+  console.log('\n📝 align-subs.js Tests\n');
 
-    it('handles multi-word subtitle blocks', () => {
-      const multi = `1
+  // parseSRT — basic parsing
+  const subs = parseSRT(SAMPLE_SRT);
+  assert(subs.length === 3, 'parseSRT parses 3 subtitle blocks');
+  assert(subs[0].text === 'Hello', 'First subtitle text is "Hello"');
+  assert(subs[1].text === 'World', 'Second subtitle text is "World"');
+  assert(Math.abs(subs[0].start - 1.0) < 0.01, 'First start time is ~1.0s');
+  assert(Math.abs(subs[0].end - 2.5) < 0.01, 'First end time is ~2.5s');
+  assert(Math.abs(subs[1].start - 2.6) < 0.01, 'Second start time is ~2.6s');
+
+  // parseSRT — multi-word block
+  const multi = `1
 00:00:01,000 --> 00:00:03,000
 This is multiple words`;
-      const subs = parseSRT(multi);
-      expect(subs).toHaveLength(1);
-      expect(subs[0].text).toBe('This is multiple words');
-    });
+  const multiSubs = parseSRT(multi);
+  assert(multiSubs.length === 1, 'Multi-word block parsed as single subtitle');
+  assert(multiSubs[0].text === 'This is multiple words', 'Multi-word text preserved');
 
-    it('skips malformed blocks', () => {
-      const bad = `1
+  // parseSRT — skips malformed blocks
+  const bad = `1
 not a time --> 00:00:02,000
 text`;
-      const subs = parseSRT(bad);
-      expect(subs).toHaveLength(0);
-    });
-  });
+  const badSubs = parseSRT(bad);
+  assert(badSubs.length === 0, 'Malformed blocks are skipped');
 
-  describe('formatTime', () => {
-    it('formats seconds into SRT time code', () => {
-      expect(formatTime(1.0)).toBe('00:00:01,000');
-      expect(formatTime(61.5)).toBe('00:01:01,500');
-      expect(formatTime(3661.123)).toBe('01:01:01,123');
-    });
+  // formatTime
+  assert(formatTime(1.0) === '00:00:01,000', 'formatTime: 1.0s → 00:00:01,000');
+  assert(formatTime(61.5) === '00:01:01,500', 'formatTime: 61.5s → 00:01:01,500');
+  assert(formatTime(3661.123) === '01:01:01,123', 'formatTime: 3661.123s → 01:01:01,123');
+  assert(formatTime(0.005) === '00:00:00,005', 'formatTime: 0.005s pads ms correctly');
+  assert(formatTime(65.04) === '00:01:05,040', 'formatTime: 65.04s pads correctly');
 
-    it('pads single-digit hours/minutes/seconds/ms', () => {
-      expect(formatTime(0.005)).toBe('00:00:00,005');
-      expect(formatTime(65.04)).toBe('00:01:05,040');
-    });
-  });
-});
+  // generateTikTokSRT — groups words into phrases
+  const tiktok = generateTikTokSRT(subs, 3);
+  assert(typeof tiktok === 'string', 'generateTikTokSRT returns a string');
+  assert(tiktok.includes('00:00:01,000 --> 00:00:02,500'), 'Output contains SRT time codes');
+  assert(tiktok.includes('Hello World'), 'Groups adjacent subtitles into phrases');
 
-// We test parseSRT and formatTime — the core pure functions.
-// generateTikTokSRT is integration-level (requires full subtitles array + ffmpeg).
-// The main CLI path requires actual files, covered manually.
+  // generateTikTokSRT — fills small gaps
+  const gapSubs = [
+    { start: 1.0, end: 2.0, text: 'Hello' },
+    { start: 2.5, end: 3.5, text: 'World' }  // 0.5s gap — should NOT be filled
+  ];
+  const gapOutput = generateTikTokSRT(gapSubs, 3);
+  assert(gapOutput.includes('World'), 'Gap output still contains both subtitles');
+
+  // generateTikTokSRT — fills 200ms gaps
+  const tinyGapSubs = [
+    { start: 1.0, end: 2.0, text: 'Hello' },
+    { start: 2.15, end: 3.0, text: 'World' }  // 150ms gap — should be filled
+  ];
+  const tinyGapOutput = generateTikTokSRT(tinyGapSubs, 3);
+  assert(tinyGapOutput.includes('Hello World'), 'Tiny gap (<200ms) subtitles are grouped');
+
+  console.log(`\n${'='.repeat(40)}`);
+  console.log(`📝 align-subs Results: ${passed} passed, ${failed} failed\n`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+run();

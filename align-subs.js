@@ -139,3 +139,5 @@ if (!srtPath) {
   console.log(`Generated ${outputCount} phrase-grouped subtitles`);
   console.log(`Saved to: ${outputPath}`);
 }
+
+module.exports = { parseSRT, formatTime, generateTikTokSRT };
